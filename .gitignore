@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python environments
+*.egg-info/
+
+# Model files
+*.pkl
+*.joblib
+*.h5
+*.keras
+*.pt
+*.pth
+
+# Temporary/generated files
+*.tmp
+*.log
