@@ -1,0 +1,71 @@
+{
+  "student_id": "STU00018",
+  "semester": 2,
+  "dropout_probability": 0.6044,
+  "retention_probability": 0.3956,
+  "risk_level": "HIGH",
+  "risk_factors": [
+    {
+      "feature": "attendance_percentage",
+      "value": 69.09,
+      "contribution": 0.3252,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "courses_failed",
+      "value": 2,
+      "contribution": 0.268,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "cumulative_gpa",
+      "value": 6.36,
+      "contribution": 0.2254,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "backlog_count",
+      "value": 2,
+      "contribution": 0.212,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "courses_passed",
+      "value": 3,
+      "contribution": 0.1774,
+      "direction": "increases_risk"
+    }
+  ],
+  "protective_factors": [
+    {
+      "feature": "fee_payment_status",
+      "value": "Paid",
+      "contribution": -0.4417,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "courses_enrolled",
+      "value": 5,
+      "contribution": -0.0954,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "internship_status",
+      "value": "Not Started",
+      "contribution": -0.08,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "program",
+      "value": "B.Tech",
+      "contribution": -0.0725,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "extracurricular_score",
+      "value": 7.91,
+      "contribution": -0.0598,
+      "direction": "reduces_risk"
+    }
+  ]
+}

@@ -101,7 +101,7 @@ train_df["age_at_admission"] = train_df["admission_year"] - pd.to_datetime(train
 test_df["age_at_admission"] = test_df["admission_year"] - pd.to_datetime(test_df["date_of_birth"]).dt.year
 
 TARGET = "future_dropout"
-DROP_COLS = ["student_id", "date_of_birth", TARGET, "academic_year"]
+DROP_COLS = ["student_id", "date_of_birth", TARGET, "academic_year", "state"]
 
 X_train = train_df.drop(columns=DROP_COLS)
 y_train = train_df[TARGET]

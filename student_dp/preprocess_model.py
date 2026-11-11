@@ -55,6 +55,7 @@ DROP_COLUMNS = [
     "date_of_birth",
     TARGET,
     "academic_year",
+    "state",
 ]
 
 

@@ -48,7 +48,7 @@ df["age_at_admission"] = (
 )
 
 TARGET = "future_dropout"
-DROP_COLS = ["student_id", "date_of_birth", TARGET, "academic_year"]
+DROP_COLS = ["student_id", "date_of_birth", TARGET, "academic_year", "state"]
 
 X = df.drop(columns=DROP_COLS)
 y = df[TARGET]

@@ -1,0 +1,22 @@
+{
+  "low_max": 0.4,
+  "medium_max": 0.6,
+  "high_min": 0.6,
+  "selection_reason": "Recommended operational thresholds based on precision-recall trade-offs: LOW (< 0.40) filters out 72% of safe students. MEDIUM (0.40 to 0.59) triggers light advising and catches 74% of at-risk students with a balanced 28% workload. HIGH (>= 0.60) captures urgent high-probability dropouts with elevated precision (34.5%) for targeted intervention.",
+  "metrics": {
+    "medium_threshold": {
+      "threshold": 0.4,
+      "precision": 0.1762820512820513,
+      "recall": 0.8237885462555066,
+      "f1": 0.2904177667339649,
+      "pct_flagged": 38.404170588661216
+    },
+    "high_threshold": {
+      "threshold": 0.6,
+      "precision": 0.2507793557325944,
+      "recall": 0.6378854625550661,
+      "f1": 0.3600198906016907,
+      "pct_flagged": 20.90362754326262
+    }
+  }
+}

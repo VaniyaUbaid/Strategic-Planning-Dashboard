@@ -1,0 +1,71 @@
+{
+  "student_id": "STU00001",
+  "semester": 2,
+  "dropout_probability": 0.2221,
+  "retention_probability": 0.7779,
+  "risk_level": "LOW",
+  "risk_factors": [
+    {
+      "feature": "scholarship_status",
+      "value": 0,
+      "contribution": 0.0973,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "attendance_percentage",
+      "value": 75.98,
+      "contribution": 0.0717,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "courses_failed",
+      "value": 1,
+      "contribution": 0.0507,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "semester_gpa",
+      "value": 7.59,
+      "contribution": 0.0399,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "backlog_count",
+      "value": 1,
+      "contribution": 0.0399,
+      "direction": "increases_risk"
+    }
+  ],
+  "protective_factors": [
+    {
+      "feature": "cumulative_gpa",
+      "value": 7.68,
+      "contribution": -0.4685,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "fee_payment_status",
+      "value": "Paid",
+      "contribution": -0.4417,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "internal_marks_percentage",
+      "value": 79.66,
+      "contribution": -0.0812,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "internship_status",
+      "value": "Not Started",
+      "contribution": -0.08,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "extracurricular_score",
+      "value": 7.78,
+      "contribution": -0.0566,
+      "direction": "reduces_risk"
+    }
+  ]
+}

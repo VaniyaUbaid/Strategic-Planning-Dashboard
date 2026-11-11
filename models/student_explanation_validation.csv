@@ -1,0 +1,4 @@
+student_id,semester,probability,risk_level,top_risk_factor_1,top_risk_factor_2,top_risk_factor_3
+STU00001,2,0.2221,LOW,scholarship_status (0),attendance_percentage (75.98),courses_failed (1)
+STU00024,7,0.4827,MEDIUM,cumulative_gpa (5.59),internal_marks_percentage (56.13),semester (7)
+STU00018,2,0.6044,HIGH,attendance_percentage (69.09),courses_failed (2),cumulative_gpa (6.36)

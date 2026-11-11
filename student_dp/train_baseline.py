@@ -62,6 +62,7 @@ DROP_COLUMNS = [
     "date_of_birth",
     TARGET,
     "academic_year",
+    "state",
 ]
 
 X_train = train_df.drop(columns=DROP_COLUMNS)

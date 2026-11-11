@@ -1,0 +1,71 @@
+{
+  "student_id": "STU00042",
+  "semester": 7,
+  "dropout_probability": 0.33,
+  "retention_probability": 0.67,
+  "risk_level": "LOW",
+  "risk_factors": [
+    {
+      "feature": "cumulative_gpa",
+      "value": 6.43,
+      "contribution": 0.1886,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "internal_marks_percentage",
+      "value": 58.4,
+      "contribution": 0.1606,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "semester",
+      "value": 7,
+      "contribution": 0.0983,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "scholarship_status",
+      "value": 0,
+      "contribution": 0.0973,
+      "direction": "increases_risk"
+    },
+    {
+      "feature": "courses_failed",
+      "value": 1,
+      "contribution": 0.0507,
+      "direction": "increases_risk"
+    }
+  ],
+  "protective_factors": [
+    {
+      "feature": "fee_payment_status",
+      "value": "Paid",
+      "contribution": -0.4417,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "assignments_completed_pct",
+      "value": 90.73,
+      "contribution": -0.2075,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "internship_status",
+      "value": "Completed",
+      "contribution": -0.1164,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "attendance_percentage",
+      "value": 80.15,
+      "contribution": -0.0817,
+      "direction": "reduces_risk"
+    },
+    {
+      "feature": "age",
+      "value": 25,
+      "contribution": -0.0608,
+      "direction": "reduces_risk"
+    }
+  ]
+}
