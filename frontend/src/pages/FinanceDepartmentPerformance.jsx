@@ -24,44 +24,62 @@ export default function FinanceDepartmentPerformance() {
 
   useEffect(() => {
     if (isHod) {
-      setFilters((current) => ({ ...current, department_id: assignedDepartment }));
+      setFilters((current) => (current.department_id === assignedDepartment ? current : { ...current, department_id: assignedDepartment }));
     }
   }, [assignedDepartment, isHod]);
 
-  const fetchFilterOptions = useCallback(() => api.getFinanceFilters()
-    .then((options) => {
-      setFilterOptions(options);
-      setFilterError(null);
-    })
-    .catch((err) => {
-      setFilterError(err.message || "Unable to load financial filters.");
-    }), []);
-
-  useEffect(() => {
-    fetchFilterOptions();
-  }, [fetchFilterOptions]);
-
-  const fetchDepartmentData = useCallback(() => api.getFinanceDepartments({
-    department_id: isHod ? assignedDepartment : filters.department_id,
-    academic_year: filters.academic_year,
-  }), [assignedDepartment, filters, isHod]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchDepartmentData()
-      .then((result) => {
-        if (cancelled) return;
-        setDepartments(result.departments || []);
-        setError(null);
-        setLoading(false);
+  const fetchFilterOptions = useCallback(() => {
+    const controller = new AbortController();
+    api.getFinanceFilters({ signal: controller.signal })
+      .then((options) => {
+        setFilterOptions(options);
+        setFilterError(null);
       })
       .catch((err) => {
-        if (cancelled) return;
-        setError(err.message || "Failed to load finance department performance.");
-        setLoading(false);
+        if (controller.signal.aborted || err.name === "AbortError") return;
+        setFilterError(err.message || "Unable to load financial filters.");
       });
+    return controller;
+  }, []);
+
+  useEffect(() => {
+    const controller = fetchFilterOptions();
     return () => {
-      cancelled = true;
+      controller.abort();
+    };
+  }, [fetchFilterOptions]);
+
+  const fetchDepartmentData = useCallback(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    api.getFinanceDepartments({
+      department_id: isHod ? assignedDepartment : filters.department_id,
+      academic_year: filters.academic_year,
+    }, { signal: controller.signal })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setDepartments(result.departments || []);
+        setError(null);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || err.name === "AbortError") return;
+        setError(err.message || "Failed to load finance department performance.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return controller;
+  }, [assignedDepartment, filters, isHod]);
+
+  useEffect(() => {
+    const controller = fetchDepartmentData();
+    return () => {
+      controller.abort();
     };
   }, [fetchDepartmentData]);
 

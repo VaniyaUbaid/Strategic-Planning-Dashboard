@@ -86,16 +86,24 @@ export const api = {
   getStudentModelInsights: () => fetchJson("/api/students/analytics/model-insights"),
 
   // Finance Module APIs
-  getFinanceStatus: () => fetchJson("/api/finance/status"),
-  getFinanceFilters: () => fetchJson("/api/finance/filters"),
-  getFinanceOverview: (params = {}) => fetchJson(`/api/finance/overview${buildQueryString(params)}`),
-  getFinanceDepartments: (params = {}) => fetchJson(`/api/finance/departments${buildQueryString(params)}`),
-  getFinanceTransactions: (params = {}) => fetchJson(`/api/finance/transactions${buildQueryString(params)}`),
-  getFinanceBudget: (params = {}) => fetchJson(`/api/finance/budget${buildQueryString(params)}`),
-  getFinanceFees: (params = {}) => fetchJson(`/api/finance/fees${buildQueryString(params)}`),
-  getFinanceScholarships: (params = {}) => fetchJson(`/api/finance/scholarships${buildQueryString(params)}`),
-  getFinanceRevenueExpense: (params = {}) => fetchJson(`/api/finance/revenue-expense${buildQueryString(params)}`),
-  getFinanceRisk: (params = {}) => fetchJson(`/api/finance/risk${buildQueryString(params)}`),
+  getFinanceStatus: (options = {}) => fetchJson("/api/finance/status", options),
+  getFinanceFilters: (options = {}) => fetchJson("/api/finance/filters", options),
+  getFinanceOverview: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/overview${buildQueryString(params)}`, options),
+  getFinanceDepartments: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/departments${buildQueryString(params)}`, options),
+  getFinanceTransactions: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/transactions${buildQueryString(params)}`, options),
+  getFinanceBudget: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/budget${buildQueryString(params)}`, options),
+  getFinanceFees: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/fees${buildQueryString(params)}`, options),
+  getFinanceScholarships: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/scholarships${buildQueryString(params)}`, options),
+  getFinanceRevenueExpense: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/revenue-expense${buildQueryString(params)}`, options),
+  getFinanceRisk: (params = {}, options = {}) =>
+    fetchJson(`/api/finance/risk${buildQueryString(params)}`, options),
   getResearchStatus: () => fetchJson("/api/research/status"),
   getResearchFilters: () => fetchJson("/api/research/filters"),
   getResearchOverview: (params = {}) => fetchJson(`/api/research/overview${buildQueryString(params)}`),

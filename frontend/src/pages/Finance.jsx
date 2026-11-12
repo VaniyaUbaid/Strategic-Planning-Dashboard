@@ -79,23 +79,34 @@ export default function Finance() {
   // Keep department filter synced if user role or department changes
   useEffect(() => {
     if (isHod) {
-      setFilters((prev) => ({ ...prev, department_id: userDept }));
+      setFilters((prev) => (prev.department_id === userDept ? prev : { ...prev, department_id: userDept }));
     }
   }, [isHod, userDept]);
 
   const fetchFilters = useCallback(() => {
+    const controller = new AbortController();
     setFilterError(false);
     api
-      .getFinanceFilters()
+      .getFinanceFilters({ signal: controller.signal })
       .then((res) => setFilterOptions(res))
-      .catch(() => setFilterError(true));
+      .catch((err) => {
+        if (controller.signal.aborted || err.name === "AbortError") return;
+        setFilterError(true);
+      });
+    return controller;
   }, []);
 
   useEffect(() => {
-    fetchFilters();
+    const controller = fetchFilters();
+    return () => {
+      controller.abort();
+    };
   }, [fetchFilters]);
 
   const fetchDashboardData = useCallback(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
     setLoading(true);
     setError(null);
 
@@ -108,23 +119,35 @@ export default function Finance() {
     };
 
     Promise.all([
-      api.getFinanceOverview(params),
-      api.getFinanceScholarships(params),
-      api.getFinanceRisk(params),
+      api.getFinanceOverview(params, { signal }),
+      api.getFinanceScholarships(params, { signal }),
+      api.getFinanceRisk(params, { signal }),
     ])
       .then(([ovRes, schRes, riskRes]) => {
+        if (signal.aborted) return;
         setOverview(ovRes);
         setScholarships(schRes);
         setRisk(riskRes);
+        setError(null);
       })
       .catch((err) => {
+        if (signal.aborted || err.name === "AbortError") return;
         setError(err.message || "Failed to load financial intelligence analytics.");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return controller;
   }, [filters, isHod, userDept]);
 
   useEffect(() => {
-    fetchDashboardData();
+    const controller = fetchDashboardData();
+    return () => {
+      controller.abort();
+    };
   }, [fetchDashboardData]);
 
   const resetFilters = () =>

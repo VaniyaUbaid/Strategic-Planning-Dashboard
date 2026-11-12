@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity,
@@ -33,6 +33,16 @@ const RISK_COLORS = {
   HIGH: "#be123c",
   MEDIUM: "#d97706",
   LOW: "#059669",
+};
+
+const isGenderFeature = (factor) => {
+  if (!factor) return false;
+  if (typeof factor === "string") {
+    return factor.toLowerCase().includes("gender");
+  }
+  const name = String(factor.feature_name || "").toLowerCase();
+  const raw = String(factor.raw_feature || "").toLowerCase();
+  return name.includes("gender") || raw.includes("gender");
 };
 
 export default function Students() {
@@ -97,6 +107,15 @@ export default function Students() {
         { name: "High Risk (>=0.60)", value: overview.risk_distribution.high_count || 0, color: RISK_COLORS.HIGH },
       ]
     : [];
+
+  // Chart Datasets 2 & 3: Logistic Regression Feature Coefficients (excluding gender-related features)
+  const filteredRiskFactors = useMemo(() => {
+    return (modelInsights?.risk_factors || []).filter((factor) => !isGenderFeature(factor));
+  }, [modelInsights?.risk_factors]);
+
+  const filteredProtectiveFactors = useMemo(() => {
+    return (modelInsights?.protective_factors || []).filter((factor) => !isGenderFeature(factor));
+  }, [modelInsights?.protective_factors]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -291,7 +310,7 @@ export default function Students() {
                   </h4>
                   <div style={{ width: "100%", height: "240px" }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={modelInsights.risk_factors} layout="vertical" margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
+                      <BarChart data={filteredRiskFactors} layout="vertical" margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#fecdd3" />
                         <XAxis type="number" stroke="#9f1239" tick={{ fontSize: 11 }} label={{ value: "Log-odds coefficient", position: "insideBottom", offset: -3 }} />
                         <YAxis dataKey="feature_name" type="category" stroke="#9f1239" tick={{ fontSize: 11 }} width={140} />
@@ -309,7 +328,7 @@ export default function Students() {
                   </h4>
                   <div style={{ width: "100%", height: "240px" }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={modelInsights.protective_factors} layout="vertical" margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
+                      <BarChart data={filteredProtectiveFactors} layout="vertical" margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#a7f3d0" />
                         <XAxis type="number" stroke="#047857" tick={{ fontSize: 11 }} label={{ value: "Log-odds coefficient", position: "insideBottom", offset: -3 }} />
                         <YAxis dataKey="feature_name" type="category" stroke="#047857" tick={{ fontSize: 11 }} width={140} />

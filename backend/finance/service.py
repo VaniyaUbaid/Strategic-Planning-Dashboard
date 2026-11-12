@@ -1,6 +1,8 @@
 import logging
 import re
-from typing import Any, Dict, List, Optional
+import threading
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
 
@@ -35,6 +37,118 @@ logger = logging.getLogger(__name__)
 _SAFE_ERROR_CODE = re.compile(r"^[A-Za-z0-9_.-]{1,32}$")
 
 
+def _normalize_dept(dept: Optional[str]) -> Optional[str]:
+    if dept is None:
+        return None
+    s = str(dept).strip()
+    if s.upper() in ["ALL", "NONE", "", "NULL"]:
+        return None
+    return s.upper()
+
+
+def _normalize_ay(ay: Optional[str]) -> Optional[str]:
+    if ay is None:
+        return None
+    s = str(ay).strip()
+    if s.upper() in ["ALL", "NONE", "", "NULL"]:
+        return None
+    return s
+
+
+def _normalize_sem(sem: Optional[int]) -> Optional[int]:
+    if sem is None:
+        return None
+    try:
+        return int(sem)
+    except (ValueError, TypeError):
+        return None
+
+
+class FinanceCache:
+    """Thread-safe in-memory TTL cache with cache stampede prevention."""
+
+    def __init__(self, ttl_seconds: float = 300.0, max_size: int = 500):
+        self.ttl = ttl_seconds
+        self.max_size = max_size
+        self._cache: Dict[Tuple, Tuple[float, Any]] = {}
+        self._lock = threading.Lock()
+        self._key_locks: Dict[Tuple, threading.Lock] = {}
+        self._key_locks_lock = threading.Lock()
+        self.hits = 0
+        self.misses = 0
+
+    def _get_key_lock(self, key: Tuple) -> threading.Lock:
+        with self._key_locks_lock:
+            if key not in self._key_locks:
+                self._key_locks[key] = threading.Lock()
+            return self._key_locks[key]
+
+    def get_or_compute(self, key: Tuple, compute_fn: Callable[[], Any]) -> Any:
+        now = time.monotonic()
+        # Fast path under global lock
+        with self._lock:
+            if key in self._cache:
+                expires_at, val = self._cache[key]
+                if expires_at > now:
+                    self.hits += 1
+                    return val
+                del self._cache[key]
+
+        # Acquire per-key lock to prevent cache stampedes
+        key_lock = self._get_key_lock(key)
+        with key_lock:
+            now = time.monotonic()
+            with self._lock:
+                if key in self._cache:
+                    expires_at, val = self._cache[key]
+                    if expires_at > now:
+                        self.hits += 1
+                        return val
+
+            # Compute uncached value
+            self.misses += 1
+            val = compute_fn()
+
+            now = time.monotonic()
+            with self._lock:
+                # Evict expired if at capacity
+                if len(self._cache) >= self.max_size:
+                    expired_keys = [k for k, (exp, _) in self._cache.items() if exp <= now]
+                    for k in expired_keys:
+                        del self._cache[k]
+                    # If still at capacity, evict oldest entries
+                    if len(self._cache) >= self.max_size:
+                        oldest = sorted(self._cache.keys(), key=lambda k: self._cache[k][0])[: max(1, self.max_size // 10)]
+                        for k in oldest:
+                            del self._cache[k]
+
+                self._cache[key] = (now + self.ttl, val)
+            return val
+
+    def invalidate(self, prefix: Optional[str] = None) -> None:
+        with self._lock:
+            if prefix is None:
+                self._cache.clear()
+            else:
+                to_del = [k for k in self._cache if isinstance(k, tuple) and len(k) > 0 and k[0] == prefix]
+                for k in to_del:
+                    del self._cache[k]
+
+    def clear(self) -> None:
+        self.invalidate()
+
+    def stats(self) -> Dict[str, Any]:
+        with self._lock:
+            now = time.monotonic()
+            active = sum(1 for exp, _ in self._cache.values() if exp > now)
+            return {
+                "hits": self.hits,
+                "misses": self.misses,
+                "active_entries": active,
+                "total_cached": len(self._cache),
+            }
+
+
 class FinanceService:
     # Rule-Based Risk Constants & Thresholds
     UTILIZATION_HIGH_THRESHOLD = 106.0  # %
@@ -51,14 +165,26 @@ class FinanceService:
     RISK_HIGH_SCORE = 55.0
     RISK_MEDIUM_SCORE = 25.0
 
-    def _query_table(
+    def __init__(self, cache_ttl: float = 300.0):
+        self.cache = FinanceCache(ttl_seconds=cache_ttl)
+
+    def clear_cache(self) -> None:
+        """Clear all in-memory finance cache entries."""
+        self.cache.clear()
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Return cache hits, misses, and active entry counts."""
+        return self.cache.stats()
+
+    def _fetch_table_from_db(
         self,
         table_name: str,
         department_id: Optional[str] = None,
         academic_year: Optional[str] = None,
         semester: Optional[int] = None,
+        columns: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Query Supabase table with filters and pagination."""
+        """Direct paginated query to Supabase."""
         try:
             client = get_supabase_client()
 
@@ -67,7 +193,7 @@ class FinanceService:
             start = 0
 
             while True:
-                query = client.table(table_name).select("*")
+                query = client.table(table_name).select(columns or "*")
 
                 if department_id and str(department_id).strip():
                     clean_dept = str(department_id).strip()
@@ -85,14 +211,8 @@ class FinanceService:
                     except (ValueError, TypeError):
                         pass
 
-                res = (
-                    query
-                    .range(start, start + page_size - 1)
-                    .execute()
-                )
-
+                res = query.range(start, start + page_size - 1).execute()
                 rows = res.data if res and res.data else []
-
                 all_rows.extend(rows)
 
                 if len(rows) < page_size:
@@ -104,6 +224,32 @@ class FinanceService:
 
         except Exception as exc:
             self._raise_database_unavailable(table_name, exc)
+
+    def _query_table(
+        self,
+        table_name: str,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+        semester: Optional[int] = None,
+        columns: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Query Supabase table with caching, column projection, filters, and pagination."""
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        clean_sem = _normalize_sem(semester)
+        cols_key = str(columns).strip() if columns else "*"
+
+        cache_key = ("table", table_name, clean_dept, clean_ay, clean_sem, cols_key)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._fetch_table_from_db(
+                table_name=table_name,
+                department_id=clean_dept,
+                academic_year=clean_ay,
+                semester=clean_sem,
+                columns=columns,
+            ),
+        )
 
     @staticmethod
     def _raise_database_unavailable(table_name: str, exc: Exception) -> None:
@@ -167,12 +313,26 @@ class FinanceService:
         return FinanceStatusResponse(module="finance", status="ready")
 
     def get_filter_options(self) -> FinanceFilterOptionsResponse:
-        budget_rows = self._query_table("finance_budgets")
-        fee_rows = self._query_table("finance_fees")
+        cache_key = ("filter_options",)
+        return self.cache.get_or_compute(
+            cache_key,
+            self._compute_filter_options,
+        )
+
+    def _compute_filter_options(self) -> FinanceFilterOptionsResponse:
+        budget_rows = self._query_table("finance_budgets", columns="department_id,academic_year")
 
         depts = sorted(list({str(r["department_id"]) for r in budget_rows if r.get("department_id")}))
         years = sorted(list({str(r["academic_year"]) for r in budget_rows if r.get("academic_year")}))
-        semesters = sorted(list({int(r["semester"]) for r in fee_rows if r.get("semester") is not None}))
+
+        # Query distinct semesters efficiently instead of downloading 40,000 full rows
+        try:
+            client = get_supabase_client()
+            sem_res = client.table("finance_fees").select("semester").limit(1000).execute()
+            raw_sems = {int(r["semester"]) for r in (sem_res.data or []) if r.get("semester") is not None}
+            semesters = sorted(list(raw_sems)) if raw_sems else [1, 2, 3, 4, 5, 6, 7, 8]
+        except Exception:
+            semesters = [1, 2, 3, 4, 5, 6, 7, 8]
 
         return FinanceFilterOptionsResponse(
             departments=depts,
@@ -234,16 +394,37 @@ class FinanceService:
 
         return level, round(score, 1), factors
 
-    def get_overview(
+    def _compute_overview_metrics(
         self,
         department_id: Optional[str] = None,
         academic_year: Optional[str] = None,
         semester: Optional[int] = None,
-    ) -> FinanceOverviewResponse:
-        dept_sum_rows = self._query_table("finance_department_summaries", department_id, academic_year)
-        budget_rows = self._query_table("finance_budgets", department_id, academic_year)
-        fee_rows = self._query_table("finance_fees", department_id, academic_year, semester)
-        schol_rows = self._query_table("finance_scholarships", department_id, academic_year)
+    ) -> Dict[str, Any]:
+        dept_sum_rows = self._query_table(
+            "finance_department_summaries",
+            department_id,
+            academic_year,
+            columns="revenue,expense",
+        )
+        budget_rows = self._query_table(
+            "finance_budgets",
+            department_id,
+            academic_year,
+            columns="allocated_budget,actual_expenditure",
+        )
+        fee_rows = self._query_table(
+            "finance_fees",
+            department_id,
+            academic_year,
+            semester,
+            columns="fee_paid,fee_pending,fee_due",
+        )
+        schol_rows = self._query_table(
+            "finance_scholarships",
+            department_id,
+            academic_year,
+            columns="amount_awarded,amount_disbursed",
+        )
 
         total_revenue = sum(float(r.get("revenue") or 0.0) for r in dept_sum_rows)
         total_expenses = sum(float(r.get("expense") or 0.0) for r in dept_sum_rows)
@@ -257,6 +438,11 @@ class FinanceService:
             else 0.0
         )
         budget_variance = round(actual_expenditure - total_budget, 2)
+        budget_var_pct = (
+            round(((actual_expenditure - total_budget) / total_budget) * 100, 2)
+            if total_budget > 0
+            else 0.0
+        )
 
         total_fees_collected = sum(float(r.get("fee_paid") or 0.0) for r in fee_rows)
         outstanding_fees = sum(float(r.get("fee_pending") or 0.0) for r in fee_rows)
@@ -266,23 +452,115 @@ class FinanceService:
             if total_fee_due > 0
             else 0.0
         )
+        outstanding_fee_pct = (
+            round((outstanding_fees / total_fee_due) * 100, 2)
+            if total_fee_due > 0
+            else 0.0
+        )
+        rev_exp_ratio = (
+            round(total_revenue / total_expenses, 2)
+            if total_expenses > 0
+            else 1.0
+        )
 
         total_scholarship_amount = sum(float(r.get("amount_awarded") or 0.0) for r in schol_rows)
         scholarships_disbursed = sum(float(r.get("amount_disbursed") or 0.0) for r in schol_rows)
 
+        return {
+            "total_revenue": round(total_revenue, 2),
+            "total_expenses": round(total_expenses, 2),
+            "net_surplus_deficit": net_surplus_deficit,
+            "total_budget": round(total_budget, 2),
+            "actual_expenditure": round(actual_expenditure, 2),
+            "budget_utilization": budget_utilization,
+            "budget_variance": budget_variance,
+            "budget_var_pct": budget_var_pct,
+            "total_fees_collected": round(total_fees_collected, 2),
+            "outstanding_fees": round(outstanding_fees, 2),
+            "total_fee_due": round(total_fee_due, 2),
+            "fee_collection_rate": fee_collection_rate,
+            "outstanding_fee_pct": outstanding_fee_pct,
+            "rev_exp_ratio": rev_exp_ratio,
+            "total_scholarship_amount": round(total_scholarship_amount, 2),
+            "scholarships_disbursed": round(scholarships_disbursed, 2),
+        }
+
+    def get_overview_metrics(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+        semester: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Compute or retrieve cached overview metrics for the given filter scope."""
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        clean_sem = _normalize_sem(semester)
+        cache_key = ("overview_metrics", clean_dept, clean_ay, clean_sem)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._compute_overview_metrics(clean_dept, clean_ay, clean_sem),
+        )
+
+    def get_overview(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+        semester: Optional[int] = None,
+    ) -> FinanceOverviewResponse:
+        metrics = self.get_overview_metrics(department_id, academic_year, semester)
         return FinanceOverviewResponse(
-            total_revenue=round(total_revenue, 2),
-            total_expenses=round(total_expenses, 2),
-            net_surplus_deficit=net_surplus_deficit,
-            total_budget=round(total_budget, 2),
-            actual_expenditure=round(actual_expenditure, 2),
-            budget_utilization=budget_utilization,
-            budget_variance=budget_variance,
-            total_fees_collected=round(total_fees_collected, 2),
-            outstanding_fees=round(outstanding_fees, 2),
-            fee_collection_rate=fee_collection_rate,
-            total_scholarship_amount=round(total_scholarship_amount, 2),
-            scholarships_disbursed=round(scholarships_disbursed, 2),
+            total_revenue=metrics["total_revenue"],
+            total_expenses=metrics["total_expenses"],
+            net_surplus_deficit=metrics["net_surplus_deficit"],
+            total_budget=metrics["total_budget"],
+            actual_expenditure=metrics["actual_expenditure"],
+            budget_utilization=metrics["budget_utilization"],
+            budget_variance=metrics["budget_variance"],
+            total_fees_collected=metrics["total_fees_collected"],
+            outstanding_fees=metrics["outstanding_fees"],
+            fee_collection_rate=metrics["fee_collection_rate"],
+            total_scholarship_amount=metrics["total_scholarship_amount"],
+            scholarships_disbursed=metrics["scholarships_disbursed"],
+        )
+
+    def get_risk(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+    ) -> FinanceRiskResponse:
+        """Evaluate rule-based risk by reusing pre-aggregated / cached overview metrics."""
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+
+        # Risk is scoped to (department, academic_year) and shares cached overview metrics
+        metrics = self.get_overview_metrics(clean_dept, clean_ay, semester=None)
+
+        risk_level, risk_score, factors = self.calculate_risk(
+            metrics["budget_utilization"],
+            metrics["rev_exp_ratio"],
+            metrics["outstanding_fee_pct"],
+        )
+
+        metrics_dict = {
+            "budget_utilization": metrics["budget_utilization"],
+            "budget_variance_percentage": metrics["budget_var_pct"],
+            "revenue_expense_ratio": metrics["rev_exp_ratio"],
+            "fee_collection_rate": metrics["fee_collection_rate"],
+            "outstanding_fee_percentage": metrics["outstanding_fee_pct"],
+            "allocated_budget": metrics["total_budget"],
+            "actual_expenditure": metrics["actual_expenditure"],
+            "total_revenue": metrics["total_revenue"],
+            "total_expenses": metrics["total_expenses"],
+            "outstanding_fees": metrics["outstanding_fees"],
+        }
+
+        return FinanceRiskResponse(
+            department_id=department_id,
+            academic_year=academic_year,
+            risk_level=risk_level,
+            risk_score=risk_score,
+            contributing_factors=factors,
+            metrics=metrics_dict,
         )
 
     def get_departments(
@@ -290,29 +568,83 @@ class FinanceService:
         department_id: Optional[str] = None,
         academic_year: Optional[str] = None,
     ) -> FinanceDepartmentListResponse:
-        dept_sum_rows = self._query_table(
-            "finance_department_summaries", department_id, academic_year
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        cache_key = ("departments", clean_dept, clean_ay)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._compute_departments(clean_dept, clean_ay),
         )
-        budget_rows = self._query_table("finance_budgets", department_id, academic_year)
-        fee_rows = self._query_table("finance_fees", department_id, academic_year)
-        schol_rows = self._query_table("finance_scholarships", department_id, academic_year)
+
+    def _compute_departments(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+    ) -> FinanceDepartmentListResponse:
+        dept_sum_rows = self._query_table(
+            "finance_department_summaries",
+            department_id,
+            academic_year,
+            columns="department_id,academic_year,revenue,expense,financial_health_score",
+        )
+        budget_rows = self._query_table(
+            "finance_budgets",
+            department_id,
+            academic_year,
+            columns="department_id,academic_year,allocated_budget,actual_expenditure",
+        )
+        fee_rows = self._query_table(
+            "finance_fees",
+            department_id,
+            academic_year,
+            columns="department_id,fee_paid,fee_pending,fee_due",
+        )
+        schol_rows = self._query_table(
+            "finance_scholarships",
+            department_id,
+            academic_year,
+            columns="department_id,amount_disbursed",
+        )
         rer_rows = self._query_table(
-            "finance_revenue_expense_ratios", department_id, academic_year
+            "finance_revenue_expense_ratios",
+            department_id,
+            academic_year,
+            columns="department_id,revenue_expense_ratio",
         )
 
         departments = sorted(list({str(r["department_id"]).upper() for r in budget_rows if r.get("department_id")}))
         if not departments:
-            # Fallback to checking department summaries if budget table has no entries
             departments = sorted(list({str(r["department_id"]).upper() for r in dept_sum_rows if r.get("department_id")}))
+
+        # O(N) grouping
+        d_sum_map: Dict[str, list] = {}
+        for r in dept_sum_rows:
+            d_sum_map.setdefault(str(r.get("department_id") or "").upper(), []).append(r)
+
+        d_bud_map: Dict[str, list] = {}
+        for r in budget_rows:
+            d_bud_map.setdefault(str(r.get("department_id") or "").upper(), []).append(r)
+
+        d_fee_map: Dict[str, list] = {}
+        for r in fee_rows:
+            d_fee_map.setdefault(str(r.get("department_id") or "").upper(), []).append(r)
+
+        d_sch_map: Dict[str, list] = {}
+        for r in schol_rows:
+            d_sch_map.setdefault(str(r.get("department_id") or "").upper(), []).append(r)
+
+        d_rer_map: Dict[str, list] = {}
+        for r in rer_rows:
+            d_rer_map.setdefault(str(r.get("department_id") or "").upper(), []).append(r)
 
         items: List[DepartmentFinanceItem] = []
 
         for d_id in departments:
-            d_sum = [r for r in dept_sum_rows if str(r.get("department_id")).upper() == d_id]
-            d_bud = [r for r in budget_rows if str(r.get("department_id")).upper() == d_id]
-            d_fee = [r for r in fee_rows if str(r.get("department_id")).upper() == d_id]
-            d_sch = [r for r in schol_rows if str(r.get("department_id")).upper() == d_id]
-            d_rer = [r for r in rer_rows if str(r.get("department_id")).upper() == d_id]
+            d_sum = d_sum_map.get(d_id, [])
+            d_bud = d_bud_map.get(d_id, [])
+            d_fee = d_fee_map.get(d_id, [])
+            d_sch = d_sch_map.get(d_id, [])
+            d_rer = d_rer_map.get(d_id, [])
 
             rev = sum(float(r.get("revenue") or 0.0) for r in d_sum)
             exp = sum(float(r.get("expense") or 0.0) for r in d_sum)
@@ -371,7 +703,25 @@ class FinanceService:
         department_id: Optional[str] = None,
         academic_year: Optional[str] = None,
     ) -> FinanceTransactionsResponse:
-        tx_rows = self._query_table("finance_transactions", department_id, academic_year)
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        cache_key = ("transactions", clean_dept, clean_ay)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._compute_transactions(clean_dept, clean_ay),
+        )
+
+    def _compute_transactions(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+    ) -> FinanceTransactionsResponse:
+        tx_rows = self._query_table(
+            "finance_transactions",
+            department_id,
+            academic_year,
+            columns="amount,is_revenue,is_expense,transaction_type,revenue_category,expense_category",
+        )
         if not tx_rows:
             return FinanceTransactionsResponse(
                 total_transactions=0,
@@ -419,7 +769,25 @@ class FinanceService:
         department_id: Optional[str] = None,
         academic_year: Optional[str] = None,
     ) -> FinanceBudgetResponse:
-        budget_rows = self._query_table("finance_budgets", department_id, academic_year)
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        cache_key = ("budget", clean_dept, clean_ay)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._compute_budget(clean_dept, clean_ay),
+        )
+
+    def _compute_budget(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+    ) -> FinanceBudgetResponse:
+        budget_rows = self._query_table(
+            "finance_budgets",
+            department_id,
+            academic_year,
+            columns="department_id,academic_year,allocated_budget,actual_expenditure,budget_utilization,budget_variance,budget_overrun,calculated_overrun,utilization_category",
+        )
         if not budget_rows:
             return FinanceBudgetResponse(
                 total_allocated_budget=0.0,
@@ -478,7 +846,28 @@ class FinanceService:
         academic_year: Optional[str] = None,
         semester: Optional[int] = None,
     ) -> FinanceFeeResponse:
-        fee_rows = self._query_table("finance_fees", department_id, academic_year, semester)
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        clean_sem = _normalize_sem(semester)
+        cache_key = ("fees", clean_dept, clean_ay, clean_sem)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._compute_fees(clean_dept, clean_ay, clean_sem),
+        )
+
+    def _compute_fees(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+        semester: Optional[int] = None,
+    ) -> FinanceFeeResponse:
+        fee_rows = self._query_table(
+            "finance_fees",
+            department_id,
+            academic_year,
+            semester,
+            columns="fee_due,fee_paid,fee_pending,payment_status,semester",
+        )
         if not fee_rows:
             return FinanceFeeResponse(
                 total_fee_due=0.0,
@@ -557,7 +946,25 @@ class FinanceService:
         department_id: Optional[str] = None,
         academic_year: Optional[str] = None,
     ) -> FinanceScholarshipResponse:
-        schol_rows = self._query_table("finance_scholarships", department_id, academic_year)
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        cache_key = ("scholarships", clean_dept, clean_ay)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._compute_scholarships(clean_dept, clean_ay),
+        )
+
+    def _compute_scholarships(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+    ) -> FinanceScholarshipResponse:
+        schol_rows = self._query_table(
+            "finance_scholarships",
+            department_id,
+            academic_year,
+            columns="student_id,scholarship_type,amount_awarded,amount_disbursed,scholarship_status",
+        )
         if not schol_rows:
             return FinanceScholarshipResponse(
                 total_awarded=0.0,
@@ -624,7 +1031,25 @@ class FinanceService:
         department_id: Optional[str] = None,
         academic_year: Optional[str] = None,
     ) -> FinanceRevenueExpenseResponse:
-        dept_sum_rows = self._query_table("finance_department_summaries", department_id, academic_year)
+        clean_dept = _normalize_dept(department_id)
+        clean_ay = _normalize_ay(academic_year)
+        cache_key = ("revenue_expense", clean_dept, clean_ay)
+        return self.cache.get_or_compute(
+            cache_key,
+            lambda: self._compute_revenue_expense(clean_dept, clean_ay),
+        )
+
+    def _compute_revenue_expense(
+        self,
+        department_id: Optional[str] = None,
+        academic_year: Optional[str] = None,
+    ) -> FinanceRevenueExpenseResponse:
+        dept_sum_rows = self._query_table(
+            "finance_department_summaries",
+            department_id,
+            academic_year,
+            columns="department_id,academic_year,revenue,expense",
+        )
         if not dept_sum_rows:
             return FinanceRevenueExpenseResponse(overall_ratio=0.0, by_department=[], by_year=[])
 
@@ -685,53 +1110,6 @@ class FinanceService:
             by_year=sorted(by_yr, key=lambda x: x.academic_year),
         )
 
-    def get_risk(
-        self,
-        department_id: Optional[str] = None,
-        academic_year: Optional[str] = None,
-    ) -> FinanceRiskResponse:
-        budget_rows = self._query_table("finance_budgets", department_id, academic_year)
-        fee_rows = self._query_table("finance_fees", department_id, academic_year)
-        dept_sum_rows = self._query_table("finance_department_summaries", department_id, academic_year)
 
-        alloc = sum(float(r.get("allocated_budget") or 0.0) for r in budget_rows)
-        act_exp = sum(float(r.get("actual_expenditure") or 0.0) for r in budget_rows)
-        utilization = round((act_exp / alloc) * 100, 2) if alloc > 0 else 0.0
-        budget_var_pct = round(((act_exp - alloc) / alloc) * 100, 2) if alloc > 0 else 0.0
-
-        rev = sum(float(r.get("revenue") or 0.0) for r in dept_sum_rows)
-        exp = sum(float(r.get("expense") or 0.0) for r in dept_sum_rows)
-        rev_exp_ratio = round(rev / exp, 2) if exp > 0 else 1.0
-
-        f_due = sum(float(r.get("fee_due") or 0.0) for r in fee_rows)
-        f_paid = sum(float(r.get("fee_paid") or 0.0) for r in fee_rows)
-        f_pend = sum(float(r.get("fee_pending") or 0.0) for r in fee_rows)
-        coll_rate = round((f_paid / f_due) * 100, 2) if f_due > 0 else 0.0
-        out_pct = round((f_pend / f_due) * 100, 2) if f_due > 0 else 0.0
-
-        risk_level, risk_score, factors = self.calculate_risk(utilization, rev_exp_ratio, out_pct)
-
-        metrics = {
-            "budget_utilization": utilization,
-            "budget_variance_percentage": budget_var_pct,
-            "revenue_expense_ratio": rev_exp_ratio,
-            "fee_collection_rate": coll_rate,
-            "outstanding_fee_percentage": out_pct,
-            "allocated_budget": alloc,
-            "actual_expenditure": act_exp,
-            "total_revenue": rev,
-            "total_expenses": exp,
-            "outstanding_fees": f_pend,
-        }
-
-        return FinanceRiskResponse(
-            department_id=department_id,
-            academic_year=academic_year,
-            risk_level=risk_level,
-            risk_score=risk_score,
-            contributing_factors=factors,
-            metrics=metrics,
-        )
-
-
+# Singleton instance
 finance_service = FinanceService()
