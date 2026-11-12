@@ -8,28 +8,24 @@ export default function FilterBar({
   onFilterChange,
   showRiskFilter = true,
   showSearch = true,
+  showProgramFilter = false,
 }) {
   const { activeRole, userDepartment } = useRole();
 
   const [departments, setDepartments] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [semesters, setSemesters] = useState([]);
-  const [loadingOpts, setLoadingOpts] = useState(false);
+  const [programs, setPrograms] = useState([]);
 
   const isDepartmentLocked = activeRole === "HOD" || activeRole === "PROFESSOR";
 
   // Fetch departments on mount & role change
   useEffect(() => {
-    setLoadingOpts(true);
     api
       .getAccessibleDepartments()
-      .then((data) => {
-        setDepartments(data || []);
-        setLoadingOpts(false);
-      })
+      .then((data) => setDepartments(data || []))
       .catch((err) => {
         console.warn("Could not fetch departments:", err);
-        setLoadingOpts(false);
       });
   }, [activeRole, userDepartment]);
 
@@ -40,7 +36,7 @@ export default function FilterBar({
       .getAccessibleYears(deptToUse)
       .then((data) => setAcademicYears(data || []))
       .catch((err) => console.warn("Could not fetch years:", err));
-  }, [filters.department, activeRole, userDepartment]);
+  }, [filters.department, activeRole, userDepartment, isDepartmentLocked]);
 
   // Fetch dynamic dependent semesters when department or academic year changes
   useEffect(() => {
@@ -49,7 +45,20 @@ export default function FilterBar({
       .getAccessibleSemesters(deptToUse, filters.academicYear)
       .then((data) => setSemesters(data || []))
       .catch((err) => console.warn("Could not fetch semesters:", err));
-  }, [filters.department, filters.academicYear, activeRole, userDepartment]);
+  }, [filters.department, filters.academicYear, activeRole, userDepartment, isDepartmentLocked]);
+
+  useEffect(() => {
+    if (!showProgramFilter) return undefined;
+    const deptToUse = isDepartmentLocked ? userDepartment : filters.department;
+    api
+      .getStudentFilters({ department: deptToUse, academic_year: filters.academicYear })
+      .then((data) => setPrograms(data.programs || []))
+      .catch((err) => {
+        console.warn("Could not fetch programs:", err);
+        setPrograms([]);
+      });
+    return undefined;
+  }, [showProgramFilter, filters.department, filters.academicYear, activeRole, userDepartment, isDepartmentLocked]);
 
   const handleChange = (key, value) => {
     const nextFilters = { ...filters, [key]: value };
@@ -58,8 +67,10 @@ export default function FilterBar({
     if (key === "department") {
       nextFilters.academicYear = "";
       nextFilters.semester = "";
+      nextFilters.program = "";
     } else if (key === "academicYear") {
       nextFilters.semester = "";
+      nextFilters.program = "";
     }
 
     onFilterChange(nextFilters);
@@ -72,6 +83,7 @@ export default function FilterBar({
       semester: "",
       riskLevel: "",
       search: "",
+      program: "",
     });
   };
 
@@ -245,6 +257,32 @@ export default function FilterBar({
               <option value="HIGH">🔴 High Risk (≥60%)</option>
               <option value="MEDIUM">🟡 Medium Risk (40-59%)</option>
               <option value="LOW">🟢 Low Risk (&lt;40%)</option>
+            </select>
+          </div>
+        )}
+
+        {showProgramFilter && (
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#475569", marginBottom: "0.35rem" }}>
+              <BookOpen size={13} style={{ display: "inline", marginRight: "0.25rem" }} /> PROGRAM
+            </label>
+            <select
+              value={filters.program || ""}
+              onChange={(e) => handleChange("program", e.target.value)}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #cbd5e1",
+                fontSize: "0.875rem",
+                backgroundColor: "#ffffff",
+                outline: "none",
+              }}
+            >
+              <option value="">All Programs</option>
+              {programs.map((program) => (
+                <option key={program} value={program}>{program}</option>
+              ))}
             </select>
           </div>
         )}

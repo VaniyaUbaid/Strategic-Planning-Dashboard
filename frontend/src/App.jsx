@@ -6,6 +6,7 @@ import Layout from "./components/layout/Layout";
 import Login from "./pages/Login";
 import Overview from "./pages/Overview";
 import Students from "./pages/Students";
+import StudentDirectory from "./pages/StudentDirectory";
 import StudentDetail from "./pages/StudentDetail";
 import Finance from "./pages/Finance";
 import Research from "./pages/Research";
@@ -48,6 +49,7 @@ export default function App() {
               <Route index element={<Overview />} />
               <Route path="students" element={<Students />} />
               <Route path="students/department-performance" element={<StudentDepartmentPerformance />} />
+              <Route path="students/directory" element={<StudentDirectory />} />
               <Route path="students/:studentId" element={<StudentDetail />} />
               <Route path="finance" element={<Finance />} />
               <Route path="finance/department-performance" element={<FinanceDepartmentPerformance />} />

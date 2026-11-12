@@ -10,7 +10,6 @@ import ErrorAlert from "../components/common/ErrorAlert";
 import FilterBar from "../components/common/FilterBar";
 import AdminCharts from "../components/admin/AdminCharts";
 import HodDepartmentView from "../components/hod/HodDepartmentView";
-import TeacherStudentView from "../components/teacher/TeacherStudentView";
 
 export default function Overview() {
   const { activeRole, userDepartment, getRoleLabel } = useRole();
@@ -25,7 +24,6 @@ export default function Overview() {
 
   const [adminOverview, setAdminOverview] = useState(null);
   const [hodOverview, setHodOverview] = useState(null);
-  const [teacherData, setTeacherData] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -72,40 +70,12 @@ export default function Overview() {
           setError(err.message || "Failed to load HOD department overview.");
           setLoading(false);
         });
-    } else if (activeRole === "PROFESSOR") {
-      api
-        .getTeacherStudents(apiParams)
-        .then((data) => {
-          setTeacherData(data);
-          setLoading(false);
-        })
-        .catch((err) => {
-          setError(err.message || "Failed to load teacher scope student list.");
-          setLoading(false);
-        });
     }
   }, [activeRole, userDepartment, filters]);
 
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
-
-  // Listen for soft role change events from Header
-  useEffect(() => {
-    const handleRoleChanged = () => loadDashboardData();
-    window.addEventListener("roleChanged", handleRoleChanged);
-    return () => window.removeEventListener("roleChanged", handleRoleChanged);
-  }, [loadDashboardData]);
-
-  const handleResetFilters = () => {
-    setFilters({
-      department: activeRole === "ADMINISTRATOR" ? "" : userDepartment,
-      academicYear: "",
-      semester: "",
-      riskLevel: "",
-      search: "",
-    });
-  };
 
   const avgGpa = adminOverview?.average_gpa !== undefined ? adminOverview.average_gpa : adminOverview?.avg_gpa || 0.0;
   const avgAtt = adminOverview?.average_attendance !== undefined ? adminOverview.average_attendance : adminOverview?.avg_attendance || 0.0;
@@ -144,7 +114,7 @@ export default function Overview() {
         filters={filters}
         onFilterChange={setFilters}
         showRiskFilter={true}
-        showSearch={activeRole === "PROFESSOR"}
+        showSearch={false}
       />
 
       {loading ? (
@@ -226,37 +196,8 @@ export default function Overview() {
           {/* Recharts Visualizations */}
           <AdminCharts overviewData={adminOverview} />
         </div>
-      ) : activeRole === "HOD" ? (
-        /* ==================================================== */
-        /* HOD DASHBOARD VIEW                                   */
-        /* ==================================================== */
-        <HodDepartmentView hodData={hodOverview} />
       ) : (
-        /* ==================================================== */
-        /* PROFESSOR / TEACHER DASHBOARD VIEW                   */
-        /* ==================================================== */
-        <div>
-          <div className="card" style={{ padding: "1.25rem", marginBottom: "1.5rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "#0f172a" }}>
-                  Teaching Class Directory & Dropout Risk Target Scope
-                </h3>
-                <p style={{ color: "#64748b", fontSize: "0.875rem", marginTop: "0.2rem" }}>
-                  Displaying students under assigned department scope. Click any student row to inspect detailed risk factors & academic history.
-                </p>
-              </div>
-
-              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#2563eb", backgroundColor: "#eff6ff", padding: "0.3rem 0.75rem", borderRadius: "0.5rem" }}>
-                Total Students: {teacherData?.total_students || 0}
-              </span>
-            </div>
-          </div>
-
-          <div className="card">
-            <TeacherStudentView students={teacherData?.students || []} onResetFilters={handleResetFilters} />
-          </div>
-        </div>
+        <HodDepartmentView hodData={hodOverview} />
       )}
     </div>
   );

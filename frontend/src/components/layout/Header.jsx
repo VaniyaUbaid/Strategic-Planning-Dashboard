@@ -1,10 +1,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Shield, LogOut, UserCheck } from "lucide-react";
+import { Activity, Shield, LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Header({ pageTitle = "Dashboard" }) {
-  const { user, role, department, signOut, setRoleContextManual, demoProfiles } = useAuth();
+  const { user, role, department, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -36,10 +36,10 @@ export default function Header({ pageTitle = "Dashboard" }) {
           <Shield size={16} color={isHod ? "#d97706" : "#2563eb"} />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>
-              {isHod ? `${department || "CSE"} HOD` : "Administrator"}
+              {isHod ? `${department} HOD` : "Administrator"}
             </span>
             <span style={{ fontSize: "0.7rem", color: isHod ? "#b45309" : "#1d4ed8", fontWeight: 600 }}>
-              {isHod ? `Department Access (${department || "CSE"})` : "Institution-wide Access"}
+              {isHod ? `Department Access (${department})` : "Institution-wide Access"}
             </span>
           </div>
         </div>

@@ -1,17 +1,16 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 async function fetchJson(endpoint, options = {}) {
-  const role = localStorage.getItem("platform_user_role") || "ADMINISTRATOR";
-  const dept = localStorage.getItem("platform_user_department") || "";
+  const { accessToken, ...requestOptions } = options;
+  const authToken = accessToken || localStorage.getItem("platform_auth_token") || "";
 
   const headers = {
-    "X-User-Role": role,
-    ...(dept ? { "X-User-Department": dept } : {}),
+    ...(authToken.split(".").length === 3 ? { Authorization: `Bearer ${authToken}` } : {}),
     ...(options.headers || {}),
   };
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
+    ...requestOptions,
     headers,
   });
 
@@ -38,6 +37,7 @@ function buildQueryString(params = {}) {
 export const api = {
   getHealth: () => fetchJson("/api/health"),
   getModulesStatus: () => fetchJson("/api/modules/status"),
+  getCurrentUser: (accessToken) => fetchJson("/api/auth/me", { accessToken }),
 
   // Filter options APIs
   getStudentFilters: (params = {}) => fetchJson(`/api/students/filters${buildQueryString(params)}`),
@@ -62,6 +62,24 @@ export const api = {
   // Student directory & detail APIs
   getStudents: (page = 1, pageSize = 20, filters = {}) =>
     fetchJson(`/api/students${buildQueryString({ page, page_size: pageSize, ...filters })}`),
+  getStudentDirectory: (page = 1, pageSize = 20, filters = {}) =>
+    fetchJson(`/api/students/directory${buildQueryString({ page, page_size: pageSize, ...filters })}`),
+  downloadStudentsCsv: async (filters = {}) => {
+    const authToken = localStorage.getItem("platform_auth_token") || "";
+    const response = await fetch(
+      `${API_BASE_URL}/api/students/export${buildQueryString(filters)}`,
+      {
+        headers: authToken.split(".").length === 3 ? { Authorization: `Bearer ${authToken}` } : {},
+      },
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error = new Error(errorData.detail || `API Error: ${response.status} ${response.statusText}`);
+      error.status = response.status;
+      throw error;
+    }
+    return response.blob();
+  },
   getStudentProfile: (studentId) => fetchJson(`/api/students/${studentId}`),
   getStudentRisk: (studentId) => fetchJson(`/api/students/${studentId}/risk`),
   getStudentHistory: (studentId) => fetchJson(`/api/students/${studentId}/history`),
@@ -85,6 +103,8 @@ export const api = {
   getResearchPrograms: (params = {}) => fetchJson(`/api/research/programs${buildQueryString(params)}`),
   getResearchPublications: (params = {}) => fetchJson(`/api/research/publications${buildQueryString(params)}`),
   getResearchParticipation: (params = {}) => fetchJson(`/api/research/participation${buildQueryString(params)}`),
+  getFacultyResearchAnalytics: (params = {}) =>
+    fetchJson(`/api/research/faculty/analytics${buildQueryString(params)}`),
   getDecisionStatus: () => fetchJson("/api/decision/status"),
   getDecisionOverview: (params = {}) => fetchJson(`/api/decision/overview${buildQueryString(params)}`),
   getDecisionInsights: (params = {}) => fetchJson(`/api/decision/insights${buildQueryString(params)}`),

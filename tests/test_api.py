@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi.testclient import TestClient
 from backend.main import app
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": "Bearer test-admin"})
 
 
 def test_1_health_endpoint():

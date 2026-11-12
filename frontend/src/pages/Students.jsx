@@ -1,14 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Activity,
-  AlertCircle,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronRight as ArrowIcon,
   Cpu,
   GraduationCap,
   ShieldAlert,
@@ -40,7 +36,6 @@ const RISK_COLORS = {
 };
 
 export default function Students() {
-  const navigate = useNavigate();
   const { role, department } = useAuth();
   const isHod = role === "HOD";
   const userDept = isHod ? (department || "CSE") : "";
@@ -55,10 +50,6 @@ export default function Students() {
 
   const [overview, setOverview] = useState(null);
   const [modelInsights, setModelInsights] = useState(null);
-  const [studentData, setStudentData] = useState(null);
-
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -83,49 +74,20 @@ export default function Students() {
       search: filters.search,
     };
 
-    Promise.all([
-      api.getOverview(apiParams),
-      api.getStudentModelInsights(),
-      api.getStudents(page, pageSize, apiParams),
-    ])
-      .then(([overviewRes, insightsRes, studentsRes]) => {
+    Promise.all([api.getOverview(apiParams), api.getStudentModelInsights()])
+      .then(([overviewRes, insightsRes]) => {
         setOverview(overviewRes);
         setModelInsights(insightsRes);
-        setStudentData(studentsRes);
       })
       .catch((err) => {
         setError(err.message || "Failed to load student success analytics.");
       })
       .finally(() => setLoading(false));
-  }, [filters, isHod, userDept, page, pageSize]);
+  }, [filters, isHod, userDept]);
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
-
-  const handleResetFilters = () => {
-    setFilters({
-      department: isHod ? userDept : "",
-      academicYear: "",
-      semester: "",
-      riskLevel: "",
-      search: "",
-    });
-    setPage(1);
-  };
-
-  const getRiskBadgeStyle = (level) => {
-    switch (level) {
-      case "HIGH":
-        return { backgroundColor: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" };
-      case "MEDIUM":
-        return { backgroundColor: "#fffbeb", color: "#b45309", border: "1px solid #fef3c7" };
-      case "LOW":
-        return { backgroundColor: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" };
-      default:
-        return { backgroundColor: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1" };
-    }
-  };
 
   // Chart Dataset 1: Overall Risk Pie Chart
   const pieDistributionData = overview?.risk_distribution
@@ -142,7 +104,7 @@ export default function Students() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#0f172a", marginBottom: "0.25rem" }}>
-            Student Directory & Student Success Analytics
+            Student Success & Dropout Risk Analytics
           </h1>
           <p style={{ color: "#475569", fontSize: "0.95rem" }}>
             {isHod
@@ -151,9 +113,14 @@ export default function Students() {
           </p>
         </div>
         {(role === "ADMINISTRATOR" || isHod) && (
-          <Link to="/students/department-performance" className="btn-primary">
-            View Department Performance <ArrowRight size={17} />
-          </Link>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+            <Link to="/students/directory" className="btn-primary">
+              View Enrolled Students Directory <ArrowRight size={17} />
+            </Link>
+            <Link to="/students/department-performance" className="btn-secondary">
+              View Department Performance <ArrowRight size={17} />
+            </Link>
+          </div>
         )}
       </div>
 
@@ -162,7 +129,6 @@ export default function Students() {
         filters={filters}
         onFilterChange={(newFilters) => {
           setFilters(newFilters);
-          setPage(1);
         }}
         showRiskFilter={true}
         showSearch={true}
@@ -357,138 +323,6 @@ export default function Students() {
             </section>
           )}
 
-          {/* 5. Main Enrolled Student Directory Table */}
-          <section className="card" aria-label="Enrolled Students Directory">
-            <div className="card-header">
-              <h3 className="card-title">Enrolled Students Directory</h3>
-              <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                Page {studentData?.page || 1} of {studentData?.total_pages || 1} ({studentData?.total_students?.toLocaleString() || 0} Records)
-              </span>
-            </div>
-
-            {!studentData?.students || studentData.students.length === 0 ? (
-              <div style={{ padding: "3rem", textAlign: "center", color: "#64748b" }}>
-                <AlertCircle size={40} style={{ color: "#94a3b8", marginBottom: "0.75rem" }} />
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
-                  No student records found for the selected filters.
-                </h4>
-                <p style={{ fontSize: "0.875rem", color: "#64748b", marginBottom: "1rem" }}>
-                  Please select a different department, academic year, semester, or risk level.
-                </p>
-                <button className="btn-secondary" onClick={handleResetFilters}>
-                  Reset Filters
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Student ID</th>
-                        <th>Program</th>
-                        <th>Department</th>
-                        <th>Sem</th>
-                        <th>Academic Year</th>
-                        <th>GPA</th>
-                        <th>Attendance</th>
-                        <th>Backlogs</th>
-                        <th>Dropout Prob</th>
-                        <th>Risk Level</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {studentData.students.map((student) => {
-                        const gpaVal = student.gpa !== undefined ? student.gpa : student.cumulative_gpa;
-                        const attVal = student.attendance_percentage !== undefined ? student.attendance_percentage : null;
-                        const riskLvl = student.risk_level || "LOW";
-                        const dropProb = student.dropout_probability !== undefined ? student.dropout_probability : null;
-
-                        return (
-                          <tr
-                            key={student.student_id}
-                            className="clickable"
-                            onClick={() => navigate(`/students/${student.student_id}`)}
-                          >
-                            <td style={{ fontWeight: 700, color: "#0f172a" }}>{student.student_id}</td>
-                            <td>{student.program || "N/A"}</td>
-                            <td>{student.department_name || student.department_id || "N/A"}</td>
-                            <td>Sem {student.semester || student.latest_semester}</td>
-                            <td>{student.academic_year || student.latest_academic_year}</td>
-                            <td style={{ fontWeight: 600, color: gpaVal && gpaVal >= 7.0 ? "#047857" : "#b45309" }}>
-                              {gpaVal !== null && gpaVal !== undefined ? Number(gpaVal).toFixed(2) : "N/A"}
-                            </td>
-                            <td style={{ fontWeight: 600, color: attVal && attVal >= 75 ? "#047857" : "#be123c" }}>
-                              {attVal !== null ? `${Number(attVal).toFixed(1)}%` : "N/A"}
-                            </td>
-                            <td style={{ fontWeight: student.backlog_count > 0 ? 700 : 400, color: student.backlog_count > 0 ? "#be123c" : "#475569" }}>
-                              {student.backlog_count !== undefined ? student.backlog_count : 0}
-                            </td>
-                            <td style={{ fontWeight: 700, color: dropProb && dropProb >= 0.60 ? "#be123c" : dropProb && dropProb >= 0.40 ? "#b45309" : "#047857" }}>
-                              {dropProb !== null && dropProb !== undefined ? `${(dropProb * 100).toFixed(1)}%` : "N/A"}
-                            </td>
-                            <td>
-                              <span
-                                style={{
-                                  fontSize: "0.75rem",
-                                  fontWeight: 700,
-                                  padding: "0.2rem 0.5rem",
-                                  borderRadius: "0.25rem",
-                                  display: "inline-block",
-                                  ...getRiskBadgeStyle(riskLvl),
-                                }}
-                              >
-                                {riskLvl}
-                              </span>
-                            </td>
-                            <td>
-                              <button
-                                className="btn-secondary"
-                                style={{ padding: "0.3rem 0.6rem", fontSize: "0.8rem" }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/students/${student.student_id}`);
-                                }}
-                              >
-                                Analyze <ArrowIcon size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination Controls */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid #f1f5f9" }}>
-                  <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                    Page {studentData?.page} of {studentData?.total_pages} (Total: {studentData?.total_students?.toLocaleString()} students)
-                  </span>
-
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-secondary"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      style={{ padding: "0.4rem 0.8rem" }}
-                    >
-                      <ChevronLeft size={16} /> Previous
-                    </button>
-                    <button
-                      className="btn-secondary"
-                      disabled={page >= (studentData?.total_pages || 1)}
-                      onClick={() => setPage((p) => Math.min(studentData?.total_pages || 1, p + 1))}
-                      style={{ padding: "0.4rem 0.8rem" }}
-                    >
-                      Next <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </section>
         </>
       )}
     </div>

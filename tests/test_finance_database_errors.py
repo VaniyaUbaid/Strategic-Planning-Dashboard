@@ -81,20 +81,25 @@ def test_supabase_config_prefers_backend_credentials(monkeypatch):
 
     assert supabase_client_module.get_supabase_config() == (
         "https://backend-project.supabase.co",
-        "backend-key",
+        "service-key",
     )
 
 
-def test_supabase_config_uses_publishable_key_as_public_fallback(monkeypatch):
+def test_supabase_config_does_not_use_frontend_publishable_key(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://project.supabase.co")
     monkeypatch.delenv("SUPABASE_KEY", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
     monkeypatch.setenv("VITE_SUPABASE_PUBLISHABLE_KEY", "publishable-key")
+    monkeypatch.setattr(
+        supabase_client_module.Path,
+        "is_file",
+        lambda _path: False,
+    )
 
     assert supabase_client_module.get_supabase_config() == (
         "https://project.supabase.co",
-        "publishable-key",
+        None,
     )
 
 

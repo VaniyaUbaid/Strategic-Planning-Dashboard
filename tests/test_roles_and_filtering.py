@@ -8,7 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi.testclient import TestClient
 from backend.main import app
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": "Bearer test-admin"})
 
 
 def test_get_accessible_departments_admin():
@@ -25,7 +25,11 @@ def test_get_accessible_departments_admin():
 def test_get_accessible_departments_hod():
     response = client.get(
         "/api/access/departments",
-        headers={"X-User-Role": "HOD", "X-User-Department": "Computer Science"}
+        headers={
+            "Authorization": "Bearer test-hod-cse",
+            "X-User-Role": "ADMINISTRATOR",
+            "X-User-Department": "ECE",
+        }
     )
     assert response.status_code == 200
     depts = response.json()
@@ -75,7 +79,11 @@ def test_admin_filtered_students():
 def test_hod_overview_assigned_dept():
     response = client.get(
         "/api/hod/overview",
-        headers={"X-User-Role": "HOD", "X-User-Department": "CSE"}
+        headers={
+            "Authorization": "Bearer test-hod-cse",
+            "X-User-Role": "ADMINISTRATOR",
+            "X-User-Department": "ME",
+        }
     )
     assert response.status_code == 200
     data = response.json()
@@ -89,7 +97,11 @@ def test_hod_unauthorized_department_rejection():
     # HOD assigned to CSE attempting to query Mechanical department
     response = client.get(
         "/api/hod/students?department=ME",
-        headers={"X-User-Role": "HOD", "X-User-Department": "CSE"}
+        headers={
+            "Authorization": "Bearer test-hod-cse",
+            "X-User-Role": "ADMINISTRATOR",
+            "X-User-Department": "ME",
+        }
     )
     assert response.status_code == 403
     data = response.json()
@@ -100,7 +112,7 @@ def test_hod_unauthorized_department_rejection():
 def test_teacher_students_view():
     response = client.get(
         "/api/teacher/students",
-        headers={"X-User-Role": "PROFESSOR", "X-User-Department": "CSE"}
+        headers={"Authorization": "Bearer test-hod-cse"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -119,7 +131,83 @@ def test_empty_filter_combination_graceful_handling():
     assert response.status_code == 200
     data = response.json()
     assert data["total_students"] == 0
+    assert data["total_pages"] == 0
     assert data["students"] == []
+
+
+def test_student_directory_pagination_program_filter_and_export():
+    page_response = client.get("/api/students/directory?page=2&page_size=5")
+    assert page_response.status_code == 200
+    page_data = page_response.json()
+    assert page_data["page"] == 2
+    assert page_data["page_size"] == 5
+    assert len(page_data["students"]) == 5
+    assert page_data["total_pages"] == (page_data["total_students"] + 4) // 5
+    assert {
+        "student_id",
+        "program",
+        "department_id",
+        "semester",
+        "academic_year",
+        "gpa",
+        "attendance_percentage",
+        "backlog_count",
+        "dropout_probability",
+        "risk_level",
+    }.issubset(page_data["students"][0])
+
+    student_id = page_data["students"][0]["student_id"]
+    search_response = client.get(
+        "/api/students/directory",
+        params={"search": student_id, "page_size": 5},
+    )
+    assert search_response.status_code == 200
+    assert search_response.json()["total_students"] == 1
+    assert search_response.json()["students"][0]["student_id"] == student_id
+
+    filter_options = client.get("/api/students/filters?department=CSE").json()
+    assert filter_options["programs"]
+    program = filter_options["programs"][0]
+    filtered = client.get(
+        "/api/students/directory",
+        params={"department": "CSE", "program": program, "page_size": 5},
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["students"]
+    assert all(
+        row["department_id"] == "CSE" and row["program"] == program
+        for row in filtered.json()["students"]
+    )
+
+    export = client.get("/api/students/export", params={"department": "CSE", "program": program})
+    assert export.status_code == 200
+    assert export.headers["content-type"].startswith("text/csv")
+    assert export.text.splitlines()[0] == (
+        "Student ID,Program,Department,Semester,Academic Year,GPA,Attendance,"
+        "Backlogs,Dropout Probability,Risk Level"
+    )
+
+
+def test_hod_directory_and_csv_ignore_department_override():
+    hod_headers = {"Authorization": "Bearer test-hod-cse"}
+    response = client.get(
+        "/api/students/directory",
+        params={"department": "ME", "page_size": 10},
+        headers=hod_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["students"]
+    assert all(row["department_id"] == "CSE" for row in response.json()["students"])
+
+    export = client.get(
+        "/api/students/export",
+        params={"department": "ME", "search": "STU"},
+        headers=hod_headers,
+    )
+    assert export.status_code == 200
+    rows = export.text.splitlines()[1:]
+    assert rows
+    assert all(",CSE," in row for row in rows)
 
 
 if __name__ == "__main__":
@@ -142,4 +230,8 @@ if __name__ == "__main__":
     print("  [OK] Teacher students view scope")
     test_empty_filter_combination_graceful_handling()
     print("  [OK] Empty filter combination handles zero results cleanly")
+    test_student_directory_pagination_program_filter_and_export()
+    print("  [OK] Student directory pagination, program filter, and CSV export")
+    test_hod_directory_and_csv_ignore_department_override()
+    print("  [OK] HOD directory and CSV department scope")
     print("\nALL ROLE & FILTERING TESTS PASSED SUCCESSFULLY!")

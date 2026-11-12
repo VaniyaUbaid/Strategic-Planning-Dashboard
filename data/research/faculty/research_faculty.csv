@@ -1,0 +1,101 @@
+faculty_id,faculty_name,department,designation,is_active,is_synthetic
+21427f85-70e6-5fe3-8271-f83a60362d53,Aarav Agarwal,BBA,Assistant Professor,True,True
+67ff259a-9baf-5d72-b25c-f4f9a9296dbe,Aditi Iyer,Biotech,Senior Lecturer,True,True
+926ed278-0791-5166-ada3-31bd8ec54d6b,Akash Patel,CE,Professor,True,True
+7c474914-9298-54b5-8eea-59e15142fa15,Ananya Verma,CSE,Associate Professor,True,True
+715a5a98-1b10-5a69-bd1e-3b2f14d9bf22,Arjun Das,ECE,Assistant Professor,True,True
+ce331eb9-d2f1-50c9-b9d7-dee23d6a49ff,Diya Kulkarni,EEE,Senior Lecturer,True,True
+248cac87-3fcb-501c-b10e-bdb270993920,Ishaan Sharma,IT,Professor,True,True
+88f55515-1656-57ad-9b4f-7a5902e3fd0a,Kavya Banerjee,MBA,Associate Professor,True,True
+33b7898d-44b2-548e-aa3d-c3cd51f6535d,Meera Jain,ME,Assistant Professor,True,True
+da9140b4-a12b-5f32-b08f-bb1459593a73,Neel Rao,BBA,Senior Lecturer,True,True
+de668ab8-aa78-5b81-b249-96e8bee1d0e7,Nisha Joshi,Biotech,Professor,True,True
+8ea03f63-4381-5639-90db-900bef24f883,Priya Desai,CE,Associate Professor,True,True
+4d6ac92a-7ebc-5706-9971-bb6d4a5260c6,Rahul Menon,CSE,Assistant Professor,True,True
+c5d02423-6fa1-5795-a07c-97af2d5a2a81,Riya Singh,ECE,Senior Lecturer,True,True
+6792d67e-b14c-5656-8ab6-18676420314a,Sanjay Bose,EEE,Professor,True,True
+3d86949e-3357-5253-9880-71a0ce1ddeea,Tara Kapoor,IT,Associate Professor,True,True
+d826f66b-b5c9-5b4f-9f49-c40f16754786,Vikram Reddy,MBA,Assistant Professor,True,True
+38626d05-ab09-5725-8e73-43c15ca951f9,Zoya Mukherjee,ME,Senior Lecturer,True,True
+d2fb5904-b1d9-5b1a-9e76-ee27fd07fdd9,Dev Gupta,BBA,Professor,True,True
+29dd11b3-6a9e-5160-b590-3b25123251c2,Ira Nair,Biotech,Associate Professor,True,True
+ea9a1e9d-3e3c-5586-9d81-bc364bde75d7,Kabir Srinivasan,CE,Assistant Professor,True,True
+49edf7b3-b6ae-50cc-aaa6-1bc736073629,Maya Chandra,CSE,Senior Lecturer,True,True
+6f89d146-2df6-55a5-93d5-6e55b29c68fb,Nikhil Khan,ECE,Professor,True,True
+0d95ab8b-099a-58cc-b98a-ef870c97b5dc,Sana Shah,EEE,Associate Professor,True,True
+308572a2-85fd-54ec-9dac-02bf8c3c8f3e,Aarav Agarwal 025,IT,Assistant Professor,True,True
+b4baa852-d3fa-5f6b-983c-93ab5cb672b5,Aditi Iyer 026,MBA,Senior Lecturer,True,True
+e95a7d03-55cf-5fb9-9c8b-1de5dee20fd4,Akash Patel 027,ME,Professor,True,True
+fa6d5df2-7896-54a2-90e3-8ee9821a6091,Ananya Verma 028,BBA,Associate Professor,True,True
+193fed6d-5f18-5a1d-acf9-e9a4b5e4e52f,Arjun Das 029,Biotech,Assistant Professor,True,True
+749f47e4-4c02-51a5-9fa8-74ce1a66a0a1,Diya Kulkarni 030,CE,Senior Lecturer,True,True
+e99f891b-30e4-579e-8c0d-c97aac4839ec,Ishaan Sharma 031,CSE,Professor,True,True
+f1198b88-f751-5254-9687-d2f58fc6b230,Kavya Banerjee 032,ECE,Associate Professor,True,True
+3834677b-a073-5c6f-bb51-8595e1ce7288,Meera Jain 033,EEE,Assistant Professor,True,True
+95e5b3d3-92f5-52a2-90b4-763cb393c857,Neel Rao 034,IT,Senior Lecturer,True,True
+d69bb066-fdeb-551d-b877-53077ca465e1,Nisha Joshi 035,MBA,Professor,True,True
+2023b959-85ee-5106-85ad-505f36a8d74d,Priya Desai 036,ME,Associate Professor,True,True
+7b65c0d4-9201-5224-bf12-644c437fb68d,Rahul Menon 037,BBA,Assistant Professor,True,True
+f11b37d2-08e2-534a-9ff1-c0e4d5baaea3,Riya Singh 038,Biotech,Senior Lecturer,True,True
+c3b33c72-2479-5bd7-9114-a5d42c12fc84,Sanjay Bose 039,CE,Professor,True,True
+d7788f5a-fde9-5a80-8863-71d60ff4bc6f,Tara Kapoor 040,CSE,Associate Professor,True,True
+6d92e56f-0e56-52f8-98f1-ca9d4ea742e3,Vikram Reddy 041,ECE,Assistant Professor,True,True
+2c50e5f4-1ceb-50b7-84da-0384b37a970b,Zoya Mukherjee 042,EEE,Senior Lecturer,True,True
+144d5c0f-44c6-55a7-a89c-e60c6adbeed3,Dev Gupta 043,IT,Professor,True,True
+ab5f5971-b847-5f81-990b-7bf0e9f5a8e6,Ira Nair 044,MBA,Associate Professor,True,True
+493b9957-c223-5405-9be0-0004a21076ff,Kabir Srinivasan 045,ME,Assistant Professor,True,True
+71392225-fb70-5b29-9315-720815d1e319,Maya Chandra 046,BBA,Senior Lecturer,True,True
+ea2e73e5-648b-5890-8dcc-f5b9675383c1,Nikhil Khan 047,Biotech,Professor,True,True
+40710517-3dd6-561f-95dd-53f28bdb5f77,Sana Shah 048,CE,Associate Professor,True,True
+0363c49d-428b-56da-99ce-76c783beb930,Aarav Agarwal 049,CSE,Assistant Professor,True,True
+a7519037-1122-55d3-9287-489df2152f67,Aditi Iyer 050,ECE,Senior Lecturer,True,True
+67d8e615-b666-570d-9392-8bdd7fff6596,Akash Patel 051,EEE,Professor,True,True
+4bc58896-5536-570c-b9ab-fa8c186776d5,Ananya Verma 052,IT,Associate Professor,True,True
+52000e95-3c2f-5898-b971-37013ce5ff5c,Arjun Das 053,MBA,Assistant Professor,True,True
+9801bdec-1ecd-5465-9514-4dcb2d3bdf89,Diya Kulkarni 054,ME,Senior Lecturer,True,True
+5ed1b4ec-e3b6-52f1-8da3-f7ba67dedad0,Ishaan Sharma 055,BBA,Professor,True,True
+f1782d08-413c-59f1-b1b6-70bf213da300,Kavya Banerjee 056,Biotech,Associate Professor,True,True
+980d8d8b-1389-5e56-82f5-7147f1721919,Meera Jain 057,CE,Assistant Professor,True,True
+17703fc6-7439-5a50-9d9e-4495b6ed765e,Neel Rao 058,CSE,Senior Lecturer,True,True
+59740a23-0c59-538b-9571-746b973acd13,Nisha Joshi 059,ECE,Professor,True,True
+3dd40820-e653-59b6-82c3-3d9020cd64b3,Priya Desai 060,EEE,Associate Professor,True,True
+791aa0f6-5665-593a-8bea-7c8aa0143897,Rahul Menon 061,IT,Assistant Professor,True,True
+3a039e17-be9a-5da2-abf3-d8b2a3baaab7,Riya Singh 062,MBA,Senior Lecturer,True,True
+b09fcadd-4086-5fc0-b057-a33e13b23ae3,Sanjay Bose 063,ME,Professor,True,True
+4018dca7-1e55-5b8a-80f2-4688508d01f2,Tara Kapoor 064,BBA,Associate Professor,True,True
+fb29327f-1824-5d5b-a25c-8e37cf48a0a6,Vikram Reddy 065,Biotech,Assistant Professor,True,True
+1d741afb-18f0-5c25-9553-671c85ec1860,Zoya Mukherjee 066,CE,Senior Lecturer,True,True
+87bf9b24-95ad-59df-b618-fe5fbb857849,Dev Gupta 067,CSE,Professor,True,True
+430ac3b1-6f23-5889-91e6-48050b79126c,Ira Nair 068,ECE,Associate Professor,True,True
+18645eda-b8ee-5f3f-aa6e-7e2ca84ffa8e,Kabir Srinivasan 069,EEE,Assistant Professor,True,True
+6a630ef7-4ab3-5883-8cda-c387a25852cd,Maya Chandra 070,IT,Senior Lecturer,True,True
+888fa426-d2cf-5edf-9db3-3a87b2631804,Nikhil Khan 071,MBA,Professor,True,True
+2ea91952-4e59-5b04-83a1-e5776bbab758,Sana Shah 072,ME,Associate Professor,True,True
+10a60eb7-776b-5359-89b5-0d6f6b81a235,Aarav Agarwal 073,BBA,Assistant Professor,True,True
+aa0fdae5-5ed8-571d-b0a4-9df225dba4d8,Aditi Iyer 074,Biotech,Senior Lecturer,True,True
+8fd9e608-b7a1-5073-b722-0c3a1c82a62b,Akash Patel 075,CE,Professor,True,True
+45576748-04cd-5aff-8bf7-b2c7c8e039e7,Ananya Verma 076,CSE,Associate Professor,True,True
+7c963b86-613a-5a23-a1c4-48a79d23a211,Arjun Das 077,ECE,Assistant Professor,True,True
+8d7bc697-97f3-5994-843e-006e4873eff5,Diya Kulkarni 078,EEE,Senior Lecturer,True,True
+04c74594-49f7-50b3-8811-95a893e010df,Ishaan Sharma 079,IT,Professor,True,True
+d2c64a00-0af6-5ffe-96a4-03f8da2fe326,Kavya Banerjee 080,MBA,Associate Professor,True,True
+e4855123-c4c6-5b52-9f7e-e5b9c9c11017,Meera Jain 081,ME,Assistant Professor,True,True
+bef09809-4d30-541c-b511-dc13e240139e,Neel Rao 082,BBA,Senior Lecturer,True,True
+4918b92e-1f63-5f36-b314-a7084ac18bd1,Nisha Joshi 083,Biotech,Professor,True,True
+01c70911-aa0c-5ce3-bb56-1e7a67373fee,Priya Desai 084,CE,Associate Professor,True,True
+fb32dd05-10e0-5938-9be2-854e71647f6e,Rahul Menon 085,CSE,Assistant Professor,True,True
+a94dc2d3-989c-5a8d-abbe-f8964f970a34,Riya Singh 086,ECE,Senior Lecturer,True,True
+7f9b2339-18f9-5c70-b6e3-bad8acece091,Sanjay Bose 087,EEE,Professor,True,True
+1d4c4156-831c-56b3-ad33-e9ed26412702,Tara Kapoor 088,IT,Associate Professor,True,True
+da5ffaa8-e7d3-5381-b0f0-06b79201d5ae,Vikram Reddy 089,MBA,Assistant Professor,True,True
+3fce0465-790c-55aa-9ad8-8a371020f094,Zoya Mukherjee 090,ME,Senior Lecturer,True,True
+b3dcfaa0-0991-5049-a5e4-20734e3de00b,Dev Gupta 091,BBA,Professor,True,True
+e41a2012-d8ee-5a4b-a4a8-f779bf79305a,Ira Nair 092,Biotech,Associate Professor,True,True
+43112c15-9ab8-5109-8a96-19db716fdc64,Kabir Srinivasan 093,CE,Assistant Professor,True,True
+43b9a74f-a43a-51ec-b131-809750a8cd2b,Maya Chandra 094,CSE,Senior Lecturer,True,True
+b22d64a7-704b-588a-8c56-4490775bace5,Nikhil Khan 095,ECE,Professor,True,True
+927c5af4-5518-5abc-96b2-0bb58d4a1c6a,Sana Shah 096,EEE,Associate Professor,True,True
+b8230ae5-8c10-545f-8225-eb25e36d69aa,Aarav Agarwal 097,IT,Assistant Professor,False,True
+26455df3-d3d5-53d2-a555-80f6982fc071,Aditi Iyer 098,MBA,Senior Lecturer,False,True
+92b51fef-bf02-5789-9c66-edc28662c135,Akash Patel 099,ME,Professor,False,True
+a4337cfe-9c85-5b05-aa70-52dbe3c6ab5a,Ananya Verma 100,BBA,Associate Professor,False,True

@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": "Bearer test-admin"})
 
 
 def test_research_status_and_module_registration():
@@ -64,3 +64,19 @@ def test_research_empty_filter_returns_empty_analytics():
     assert response.status_code == 200
     assert response.json()["total_students"] == 0
     assert response.json()["research_participation_rate"] == 0
+
+
+def test_biotech_hod_department_code_maps_to_existing_research_department():
+    headers = {
+        "Authorization": "Bearer test-hod-bt",
+        "X-User-Role": "ADMINISTRATOR",
+        "X-User-Department": "CSE",
+    }
+
+    overview = client.get("/api/research/overview", headers=headers)
+    departments = client.get("/api/research/departments", headers=headers)
+
+    assert overview.status_code == 200
+    assert overview.json()["total_students"] > 0
+    assert departments.status_code == 200
+    assert [item["department"] for item in departments.json()["departments"]] == ["Biotech"]

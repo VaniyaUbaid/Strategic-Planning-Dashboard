@@ -23,6 +23,7 @@ class SimpleFilterOptionsResponse(BaseModel):
     departments: List[str]
     academic_years: List[int]
     semesters: List[int]
+    programs: List[str] = Field(default_factory=list)
     risk_levels: List[str] = ["LOW", "MEDIUM", "HIGH"]
 
 
@@ -248,4 +249,3 @@ class StudentModelInsightsResponse(BaseModel):
     threshold_reasoning: str = "LOW (< 0.40) filters out safe students. MEDIUM (0.40 to 0.59) triggers light advising. HIGH (>= 0.60) captures urgent high-probability dropouts."
     risk_factors: List[ModelFeatureInsight] = Field(default_factory=list)
     protective_factors: List[ModelFeatureInsight] = Field(default_factory=list)
-

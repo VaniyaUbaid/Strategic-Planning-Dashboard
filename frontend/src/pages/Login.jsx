@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ShieldCheck, LogIn, Lock } from "lucide-react";
+import { ShieldCheck, LogIn } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ErrorAlert from "../components/common/ErrorAlert";
 import "./Login.css";
@@ -11,7 +11,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  const { signIn, isAuthenticated } = useAuth();
+  const { signIn, isAuthenticated, authError } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already authenticated
@@ -41,12 +41,6 @@ export default function Login() {
     }
   };
 
-  const fillDemoAccount = (demoEmail) => {
-    setEmail(demoEmail);
-    setPassword("password123");
-    setErrorMsg(null);
-  };
-
   return (
     <div className="login-container">
       <div className="login-card">
@@ -58,9 +52,9 @@ export default function Login() {
           <p className="login-subtitle">Sign in to access platform analytics and decision tools</p>
         </div>
 
-        {errorMsg && (
+        {(errorMsg || authError) && (
           <div style={{ marginBottom: "1.25rem" }}>
-            <ErrorAlert message={errorMsg} />
+            <ErrorAlert message={errorMsg || authError} />
           </div>
         )}
 
@@ -70,7 +64,7 @@ export default function Login() {
             <input
               id="email"
               type="email"
-              placeholder="e.g. admin@institution.edu"
+              placeholder="you@institution.edu"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
@@ -102,46 +96,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="login-demo-section">
-          <div className="login-demo-title">Quick Demo Logins (Role Testing)</div>
-          <div className="login-demo-grid">
-            <button
-              type="button"
-              className="login-demo-btn"
-              onClick={() => fillDemoAccount("admin@institution.edu")}
-            >
-              👑 Administrator<br />
-              <span style={{ fontSize: "0.7rem", color: "#64748b" }}>All Access</span>
-            </button>
-
-            <button
-              type="button"
-              className="login-demo-btn"
-              onClick={() => fillDemoAccount("hod.cse@institution.edu")}
-            >
-              🏫 CSE HOD<br />
-              <span style={{ fontSize: "0.7rem", color: "#64748b" }}>Computer Science</span>
-            </button>
-
-            <button
-              type="button"
-              className="login-demo-btn"
-              onClick={() => fillDemoAccount("hod.ece@institution.edu")}
-            >
-              🏫 ECE HOD<br />
-              <span style={{ fontSize: "0.7rem", color: "#64748b" }}>Electronics Eng</span>
-            </button>
-
-            <button
-              type="button"
-              className="login-demo-btn"
-              onClick={() => fillDemoAccount("hod.aiml@institution.edu")}
-            >
-              🏫 AIML HOD<br />
-              <span style={{ fontSize: "0.7rem", color: "#64748b" }}>AI & Machine Learning</span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

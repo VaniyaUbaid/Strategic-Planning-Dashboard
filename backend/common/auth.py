@@ -1,110 +1,186 @@
 import base64
 import json
-from typing import Optional, Tuple
-from fastapi import Header, HTTPException, Query, status
+import logging
+import time
+from typing import Optional
+
+import httpx
+from fastapi import Header, HTTPException, status
+from supabase_auth.errors import AuthApiError
+
+from backend.common.supabase_client import (
+    SupabaseConfigurationError,
+    get_supabase_client,
+    get_supabase_config,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class UserContext:
-    DEPT_CODES = {"CSE", "ECE", "EEE", "AIML", "ME", "BBA", "BT", "CHEM", "MATH", "PHY"}
-
     def __init__(
         self,
-        role: Optional[str] = None,
+        user_id: str,
+        role: str,
         department_id: Optional[str] = None,
         email: Optional[str] = None,
+        access_token: Optional[str] = None,
     ):
-        clean_role = str(role).strip().upper() if isinstance(role, str) and role else "ADMINISTRATOR"
-        self.role = clean_role
-        self.email = str(email).strip().lower() if isinstance(email, str) and email else ""
-
-        # Derive department_id if missing for HOD
-        raw_dept = str(department_id).strip().upper() if isinstance(department_id, str) and department_id else ""
-        if not raw_dept and self.email:
-            for code in self.DEPT_CODES:
-                if code.lower() in self.email:
-                    raw_dept = code
-                    break
-
-        if self.role == "HOD" and not raw_dept:
-            raw_dept = "CSE"  # Safe default for HOD if unspecified
-
-        self.department_id = raw_dept if raw_dept != "ALL" and raw_dept != "" else None
+        self.user_id = user_id
+        self.role = role
+        self.department_id = department_id.upper() if department_id else None
+        self.email = email
+        self.access_token = access_token
 
     @property
     def is_admin(self) -> bool:
-        return self.role in ("ADMINISTRATOR", "ADMIN")
+        return self.role == "ADMINISTRATOR"
 
     @property
     def is_hod(self) -> bool:
         return self.role == "HOD"
 
+    def require_admin(self) -> None:
+        if not self.is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Administrator access is required.",
+            )
+
+    def require_hod(self) -> None:
+        if not self.is_hod:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="HOD access is required.",
+            )
+
     def enforce_department(self, requested_dept: Optional[str] = None) -> Optional[str]:
-        """
-        CRITICAL AUTHORIZATION ENFORCEMENT:
-        If user is HOD, ALWAYS return user's assigned department_id.
-        DISREGARD any requested_dept passed by frontend for HOD users.
-        If user is Administrator, respect requested_dept if provided (and not ALL), else None.
-        """
         if self.is_hod:
             if not self.department_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Forbidden: HOD user is not assigned to a valid department.",
+                    detail="Your account is not assigned to a department.",
                 )
-            # MANDATORY SECURITY OVERRIDE FOR HOD
-            return self.department_id.upper()
+            return self.department_id
 
-        # Administrator access
-        if requested_dept and isinstance(requested_dept, str) and requested_dept.strip().upper() not in ["ALL", "NONE", ""]:
+        if requested_dept and requested_dept.strip().upper() not in {"ALL", "NONE"}:
             return requested_dept.strip().upper()
         return None
 
 
-def parse_jwt_claims(auth_header: Optional[str]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """Parse role, department_id, and email from Bearer JWT token payload if present."""
-    if not isinstance(auth_header, str) or not auth_header.startswith("Bearer "):
-        return None, None, None
+def _unauthorized() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="A valid Supabase access token is required.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
-    token = auth_header[7:].strip()
+
+def _verified_jwt_claims(token: str, user_id: str) -> dict:
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise _unauthorized()
     try:
-        parts = token.split(".")
-        if len(parts) == 3:
-            payload_b64 = parts[1]
-            payload_b64 += "=" * (-len(payload_b64) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
+        payload_segment = parts[1] + "=" * (-len(parts[1]) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(payload_segment).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        raise _unauthorized() from None
+    if not isinstance(claims, dict):
+        raise _unauthorized()
 
-            user_meta = payload.get("user_metadata", {})
-            role = user_meta.get("role") or payload.get("role")
-            dept = user_meta.get("department_id") or user_meta.get("department")
-            email = payload.get("email") or user_meta.get("email")
-            return role, dept, email
-    except Exception:
-        pass
-    return None, None, None
+    url, _ = get_supabase_config()
+    expected_issuer = f"{url.rstrip('/')}/auth/v1" if url else None
+    audience = claims.get("aud")
+    audiences = audience if isinstance(audience, list) else [audience]
+    expires_at = claims.get("exp")
+    not_before = claims.get("nbf")
+    now = time.time()
+    if (
+        not expected_issuer
+        or claims.get("iss") != expected_issuer
+        or claims.get("sub") != user_id
+        or "authenticated" not in audiences
+        or not isinstance(expires_at, (int, float))
+        or expires_at <= now
+        or (not_before is not None and (not isinstance(not_before, (int, float)) or not_before > now))
+    ):
+        raise _unauthorized()
+    return claims
 
 
 def get_user_context(
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_department: Optional[str] = Header(None, alias="X-User-Department"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
     authorization: Optional[str] = Header(None, alias="Authorization"),
-    role: Optional[str] = Query(None),
-    user_department: Optional[str] = Query(None),
 ) -> UserContext:
-    # Safely extract string arguments if FastAPI Query/Header default objects passed
-    clean_role_hdr = x_user_role if isinstance(x_user_role, str) else None
-    clean_dept_hdr = x_user_department if isinstance(x_user_department, str) else None
-    clean_email_hdr = x_user_email if isinstance(x_user_email, str) else None
-    clean_auth_hdr = authorization if isinstance(authorization, str) else None
-    clean_role_qry = role if isinstance(role, str) else None
-    clean_dept_qry = user_department if isinstance(user_department, str) else None
+    """Verify a Supabase access token and authorize only trusted app_metadata roles."""
+    if not isinstance(authorization, str):
+        raise _unauthorized()
 
-    # 1. Parse JWT token if available
-    jwt_role, jwt_dept, jwt_email = parse_jwt_claims(clean_auth_hdr)
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not separator or not token.strip():
+        raise _unauthorized()
 
-    # 2. Determine effective role, department, and email
-    eff_role = clean_role_qry or clean_role_hdr or jwt_role or "ADMINISTRATOR"
-    eff_dept = clean_dept_qry or clean_dept_hdr or jwt_dept
-    eff_email = clean_email_hdr or jwt_email
+    try:
+        response = get_supabase_client().auth.get_user(token.strip())
+    except AuthApiError:
+        raise _unauthorized() from None
+    except httpx.RequestError as exc:
+        logger.error("Supabase token verification unavailable (error_type=%s)", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable.",
+        ) from None
+    except SupabaseConfigurationError:
+        logger.error("Supabase token verification is not configured.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is not configured.",
+        ) from None
+    except Exception as exc:
+        logger.error("Supabase token verification failed (error_type=%s)", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service could not verify the access token.",
+        ) from None
 
-    return UserContext(role=eff_role, department_id=eff_dept, email=eff_email)
+    user = getattr(response, "user", None)
+    if user is None:
+        raise _unauthorized()
+
+    claims = _verified_jwt_claims(token.strip(), getattr(user, "id", ""))
+    app_metadata = claims.get("app_metadata") or {}
+    if not isinstance(app_metadata, dict):
+        app_metadata = {}
+
+    role_value = app_metadata.get("role")
+    role = role_value.strip().upper() if isinstance(role_value, str) else ""
+    if role not in {"ADMINISTRATOR", "HOD"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account does not have an authorized application role.",
+        )
+
+    department_value = app_metadata.get("department_id")
+    department = (
+        department_value.strip().upper()
+        if isinstance(department_value, str) and department_value.strip()
+        else None
+    )
+    if role == "HOD" and not department:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your HOD account is not assigned to a department.",
+        )
+    if role == "ADMINISTRATOR":
+        department = None
+
+    user_id = getattr(user, "id", None)
+    if not isinstance(user_id, str) or not user_id:
+        raise _unauthorized()
+
+    return UserContext(
+        user_id=user_id,
+        role=role,
+        department_id=department,
+        email=getattr(user, "email", None),
+        access_token=token.strip(),
+    )

@@ -1,119 +1,119 @@
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel, Field
 
 
 class DecisionStatusResponse(BaseModel):
-    module: str = Field("decision_assistant", example="decision_assistant")
-    status: str = Field("ready", example="ready")
+    module: str = "decision_assistant"
+    status: str = "ready"
 
 
 class ScopeInfo(BaseModel):
     role: str
     department: str
-    academic_year: Optional[int] = None
+    academic_year: Optional[Union[int, str]] = None
     semester: Optional[int] = None
 
 
 class FindingItem(BaseModel):
-    domain: str  # "student", "finance", "research"
+    domain: str
     title: str
     description: str
     metric: str
-    impact: str  # "positive", "negative", "neutral"
+    impact: str = "neutral"
 
 
-class AttentionArea(BaseModel):
-    id: str
+class ActionableIssue(BaseModel):
+    domain: str
+    department: Optional[str] = None
     title: str
-    department: str
-    severity: str  # "HIGH", "MEDIUM", "LOW"
-    observation: str
-    supporting_metric: str
-    affected_modules: List[str]
-
-
-class RecommendedAction(BaseModel):
-    id: str
-    title: str
-    target_department: str
-    priority: str  # "HIGH", "MEDIUM", "LOW"
-    action: str
-    rationale: str
-    supporting_evidence: str
+    evidence: str
 
 
 class StudentEvidence(BaseModel):
-    status: str = "available"  # "available" or "unavailable"
-    total_students: int = 0
-    high_risk_students: int = 0
-    high_risk_pct: float = 0.0
-    medium_risk_students: int = 0
-    low_risk_students: int = 0
-    avg_dropout_prob: float = 0.0
-    top_risk_department: str = "N/A"
-    top_risk_factor: str = "N/A"
+    status: str
+    total_students: Optional[int] = None
+    high_risk_students: Optional[int] = None
+    high_risk_pct: Optional[float] = None
+    medium_risk_students: Optional[int] = None
+    low_risk_students: Optional[int] = None
+    avg_dropout_prob: Optional[float] = None
+    average_gpa: Optional[float] = None
+    average_attendance: Optional[float] = None
+    top_risk_department: Optional[str] = None
+    top_risk_factor: Optional[str] = None
+    risk_factors: List[str] = Field(default_factory=list)
+    department_chart: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class FinanceEvidence(BaseModel):
-    status: str = "available"
-    total_budget: float = 0.0
-    total_spent: float = 0.0
-    budget_utilization_pct: float = 0.0
-    overrun_departments_count: int = 0
-    total_outstanding_fees: float = 0.0
-    outstanding_fee_pct: float = 0.0
+    status: str
+    total_budget: Optional[float] = None
+    total_spent: Optional[float] = None
+    budget_utilization_pct: Optional[float] = None
+    overrun_departments_count: Optional[int] = None
+    total_outstanding_fees: Optional[float] = None
+    outstanding_fee_pct: Optional[float] = None
+    fee_collection_rate: Optional[float] = None
+    departments: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ResearchEvidence(BaseModel):
-    status: str = "available"
-    total_students: int = 0
-    participating_students: int = 0
-    participation_rate_pct: float = 0.0
-    total_publications: int = 0
-    avg_publications_per_student: float = 0.0
-    avg_faculty_rating: float = 0.0
+    status: str
+    total_faculty: Optional[int] = None
+    faculty_researchers: Optional[int] = None
+    total_publications: Optional[int] = None
+    average_publications_per_faculty: Optional[float] = None
+    participation_rate_pct: Optional[float] = None
+    total_citations: Optional[int] = None
+    total_research_grants: Optional[float] = None
+    is_synthetic: Optional[bool] = None
+    departments: List[Dict[str, Any]] = Field(default_factory=list)
+    publication_trends: List[Dict[str, Any]] = Field(default_factory=list)
+    top_researchers: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class DepartmentComparisonItem(BaseModel):
     department: str
-    department_name: str
-    student_high_risk_pct: float = 0.0
-    student_avg_risk: float = 0.0
-    finance_budget_utilization: float = 0.0
-    finance_outstanding_fee_pct: float = 0.0
-    research_participation_pct: float = 0.0
-    research_avg_publications: float = 0.0
-    overall_health_score: float = 0.0
-    status_label: str = "Stable"
+    student_total: Optional[int] = None
+    student_high_risk: Optional[int] = None
+    student_high_risk_pct: Optional[float] = None
+    finance_budget_utilization_pct: Optional[float] = None
+    finance_outstanding_fees: Optional[float] = None
+    finance_fee_collection_rate: Optional[float] = None
+    research_total_faculty: Optional[int] = None
+    research_publications: Optional[int] = None
+    research_publications_per_faculty: Optional[float] = None
+    research_participation_pct: Optional[float] = None
 
 
 class EvidenceSummary(BaseModel):
     student: StudentEvidence
     finance: FinanceEvidence
     research: ResearchEvidence
-    department_comparison: List[DepartmentComparisonItem] = []
+    department_comparison: List[DepartmentComparisonItem] = Field(default_factory=list)
 
 
 class DecisionOverviewResponse(BaseModel):
     scope: ScopeInfo
     summary: str
-    key_findings: List[FindingItem]
-    areas_of_attention: List[AttentionArea]
-    recommendations: List[RecommendedAction]
+    key_findings: List[FindingItem] = Field(default_factory=list)
+    actionable_issues: List[ActionableIssue] = Field(default_factory=list)
     evidence: EvidenceSummary
+    # Keep the legacy properties for API clients while no longer generating static content.
+    areas_of_attention: List[ActionableIssue] = Field(default_factory=list)
+    recommendations: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class DecisionQueryRequest(BaseModel):
-    query: str
+    query: str = Field(min_length=1, max_length=500)
     department: Optional[str] = None
-    academic_year: Optional[int] = None
+    academic_year: Optional[Union[int, str]] = None
 
 
 class DecisionQueryResponse(BaseModel):
     query: str
     matched_intent: str
     summary: str
-    findings: List[FindingItem]
-    areas_of_attention: List[AttentionArea]
-    recommendations: List[RecommendedAction]
-    supporting_metrics: Dict[str, Any]
+    findings: List[FindingItem] = Field(default_factory=list)
+    supporting_metrics: Dict[str, Any] = Field(default_factory=dict)

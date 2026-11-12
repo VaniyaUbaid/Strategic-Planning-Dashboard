@@ -167,6 +167,7 @@ class StudentService:
         semester: Optional[int] = None,
         risk_level: Optional[str] = None,
         search: Optional[str] = None,
+        program: Optional[str] = None,
     ) -> pd.DataFrame:
         """
         Enforces security role scope and dynamic filtering parameters.
@@ -206,6 +207,12 @@ class StudentService:
 
         if risk_level and str(risk_level).strip().upper() not in ["ALL", "NONE", ""]:
             target_df = target_df[target_df["risk_level"] == str(risk_level).strip().upper()]
+
+        if program and str(program).strip():
+            target_df = target_df[
+                target_df["program"].fillna("").astype(str).str.strip().str.casefold()
+                == str(program).strip().casefold()
+            ]
 
         if search and str(search).strip():
             query = str(search).strip().lower()
@@ -315,6 +322,18 @@ class StudentService:
             departments=depts,
             academic_years=years,
             semesters=semesters,
+            programs=(
+                sorted(
+                    {
+                        value.strip()
+                        for value in filtered["program"].dropna().astype(str)
+                        if value.strip()
+                    },
+                    key=str.casefold,
+                )
+                if "program" in filtered.columns
+                else []
+            ),
             risk_levels=["LOW", "MEDIUM", "HIGH"],
         )
 
@@ -581,6 +600,7 @@ class StudentService:
         search: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
+        program: Optional[str] = None,
     ) -> PaginatedDetailedStudentListResponse:
         filtered_df = self.filter_records(
             role=role,
@@ -590,6 +610,7 @@ class StudentService:
             semester=semester,
             risk_level=risk_level,
             search=search,
+            program=program,
         )
 
         total_students = len(filtered_df)
@@ -598,7 +619,7 @@ class StudentService:
                 total_students=0,
                 page=1,
                 page_size=page_size,
-                total_pages=1,
+                total_pages=0,
                 students=[],
             )
 

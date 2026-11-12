@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.common.schemas import HealthResponse, SystemModulesStatusResponse
+from backend.common.auth_router import router as auth_router
 from backend.decision import decision_router
 from backend.finance import finance_router
 from backend.research import research_router
@@ -32,6 +33,7 @@ app.add_middleware(
 )
 
 # Register Module Routers
+app.include_router(auth_router)
 app.include_router(student_router)
 app.include_router(finance_router)
 app.include_router(research_router)

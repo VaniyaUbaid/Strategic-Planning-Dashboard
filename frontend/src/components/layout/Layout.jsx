@@ -18,6 +18,7 @@ export default function Layout() {
   const getPageTitle = (path) => {
     if (path === "/") return "Platform Overview";
     if (path === "/students/department-performance") return "Student Department Performance";
+    if (path === "/students/directory") return "Enrolled Students Directory";
     if (path.startsWith("/students/")) return "Student Performance & Risk Analysis";
     if (path === "/students") return "Student Success & Dropout Risk Management";
     if (path === "/finance") return "Financial Intelligence Module";
