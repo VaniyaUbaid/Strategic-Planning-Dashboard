@@ -311,6 +311,13 @@ This project was developed as an academic special project. Certain datasets may 
 **Project:** Institutional Decision Platform  
 **Institution:** ICFAI Tech School, Hyderabad  
 **Domain:** Computer Science and Engineering
+**Project developed by:**
+Vaniya Fatma Ubaid -- `24STUCHH010251`
+Katta Venkata Manikantanadh -- `24STUCHH010881`
+Kotla Pritika -- `24STUCHH010461`
+Munnuri Gayathri -- `24STUCHH010022`
+**Faculty Guide:** Dr. Priyanka Parimi  
+Sr. Assistant Professor, Department of Computer Science and Engineering  
 
 ---
 
